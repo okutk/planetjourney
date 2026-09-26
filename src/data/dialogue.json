@@ -170,6 +170,10 @@
         "op": "missing"
       },
       {
+        "fact": "playedBefore",
+        "op": "exists"
+      },
+      {
         "fact": "daysAway",
         "op": "gte",
         "value": 1
@@ -207,6 +211,10 @@
         "fact": "daysAway",
         "op": "gte",
         "value": 7
+      },
+      {
+        "fact": "clockRewound",
+        "op": "missing"
       }
     ],
     "lines": [
@@ -329,6 +337,58 @@
     "lines": [
       "船の部屋だよ。星図の台で、次の星を選べる。"
     ]
+  },
+  {
+    "id": "resume.away",
+    "concept": "resume",
+    "criteria": [
+      {
+        "fact": "daysAway",
+        "op": "gte",
+        "value": 1
+      },
+      {
+        "fact": "daysAway",
+        "op": "lt",
+        "value": 7
+      }
+    ],
+    "lines": [
+      "あ……{daysAway}日ぶり。画面の向こうで、何してたの？",
+      "おかえり。{daysAway}日も、止まったままだったよ。"
+    ],
+    "expression": "happy"
+  },
+  {
+    "id": "resume.longAway",
+    "concept": "resume",
+    "criteria": [
+      {
+        "fact": "daysAway",
+        "op": "gte",
+        "value": 7
+      }
+    ],
+    "lines": [
+      "{daysAway}日ぶり……。わたしのこと、忘れちゃったかと思った。"
+    ],
+    "expression": "sad"
+  },
+  {
+    "id": "resume.lateNight",
+    "concept": "resume",
+    "criteria": [
+      {
+        "fact": "hour",
+        "op": "lt",
+        "value": 5
+      }
+    ],
+    "lines": [
+      "おかえり。……もう{hour}時だよ？ 少しだけ、ね。"
+    ],
+    "expression": "relaxed",
+    "cooldown": 3600
   },
   {
     "id": "starmap.first",

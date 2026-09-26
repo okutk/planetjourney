@@ -34,9 +34,25 @@ export class TalkDirector {
    * 1 日以上ぶりなら、また会えたのがうれしい（感情の reunion）。
    */
   startVisit(log: PlayLog | null, nowMs: number): void {
+    // 前の起動（や再開）の事実が残らないよう、入れ直す
+    delete this.facts.playedBefore;
+    delete this.facts.daysAway;
+    delete this.facts.clockRewound;
     const facts = visitFacts(log, nowMs);
     Object.assign(this.facts, facts);
     if (typeof facts.daysAway === 'number' && facts.daysAway >= 1) this.emotion?.feel('reunion');
+  }
+
+  /**
+   * 再読み込みせずに画面へ戻ってきたとき（スマホでアプリを切り替えて戻ったときなど）。
+   * 前回の記録と比べ直し、「N 日ぶり」や深夜なら話しかける（合うセリフがなければ黙っている）。
+   */
+  resume(log: PlayLog | null, nowMs: number, hour: number, now: number): DialogueLine | null {
+    this.setClock(hour);
+    this.startVisit(log, nowMs);
+    this.facts.idleSeconds = 0;
+    this.interrupt();
+    return this.say('resume', now);
   }
 
   /**

@@ -229,6 +229,32 @@ describe('TalkDirector', () => {
       expect(rewound.line?.ruleId).toBe('board.again');
       expect(rewound.emotion.values.joy).toBe(emotionRules.baseline.joy);
     });
+
+    it('久しぶりの反応は、朝や深夜のあいさつより優先する', () => {
+      for (let seed = 1; seed <= 20; seed++) {
+        const emotion = new Emotion(emotionRules);
+        const director = new TalkDirector(new DialogueSelector(rules, createRandom(seed)), () => 2, emotion);
+        director.startVisit({ lastPlayedAt: T0 }, T0 + 32 * DAY);
+        director.setClock(8);
+        director.enterShip();
+        expect(director.greet(0)?.ruleId).toBe('board.longAway');
+      }
+      const night = launch({ lastPlayedAt: T0 }, T0 + 3 * DAY, 2);
+      expect(night.line?.ruleId).toBe('board.away');
+    });
+
+    it('再読み込みせずに戻ってきたら、前回と比べ直して話す。すぐ戻っただけなら黙っている', () => {
+      const { director } = launch({ lastPlayedAt: T0 }, T0 + 1000, 14);
+      expect(director.resume({ lastPlayedAt: T0 + 1000 }, T0 + 60_000, 14, 100)).toBeNull();
+      expect(director.facts.daysAway).toBe(0);
+      const back = director.resume({ lastPlayedAt: T0 + 1000 }, T0 + 2 * DAY + 5000, 14, 200);
+      expect(back?.ruleId).toBe('resume.away');
+      expect(back?.text).toContain('2日');
+      // 時計が戻っていたら、前の再開の日数は残らず、久しぶりとは言わない
+      expect(director.resume({ lastPlayedAt: T0 + 2 * DAY }, T0, 14, 300)).toBeNull();
+      expect(director.facts.daysAway).toBeUndefined();
+      expect(director.facts.clockRewound).toBe(true);
+    });
   });
 });
 

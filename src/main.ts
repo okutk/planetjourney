@@ -143,9 +143,20 @@ function recordPlayTime(): void {
   talk.setClock(new Date().getHours());
 }
 recordPlayTime();
-window.setInterval(recordPlayTime, CLOCK_INTERVAL_MS);
+// 画面が隠れている間は記録を進めない（隠れた瞬間の時刻が「前回」になる）
+window.setInterval(() => {
+  if (!document.hidden) recordPlayTime();
+}, CLOCK_INTERVAL_MS);
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) recordPlayTime();
+  if (document.hidden) {
+    recordPlayTime();
+    return;
+  }
+  // 再読み込みせずに戻ってきたときも、前回と比べて「N 日ぶり」や深夜の反応をする。
+  // 隠れている間はループが止まっていて now が古いので、ループと同じ時計で進めてから話す
+  now = performance.now() / 1000;
+  say(talk.resume(playLog, Date.now(), new Date().getHours(), now), now);
+  recordPlayTime();
 });
 
 // ミラ。VRM を読み込むまでは仮の見た目。プレイヤーの斜め後ろの定位置を目指して、プレイヤーと同じ歩き方でついてくる
