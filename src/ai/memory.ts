@@ -85,8 +85,6 @@ export class MemoryBook {
   private readonly entries: MemoryEntry[];
   /** 思い出話にした時刻（ゲーム内の秒）。保存しない（起動しなおせば、また話してよい） */
   private readonly talkedAt = new Map<MemoryEntry, number>();
-  /** 保存していない変更があるか */
-  dirty = false;
 
   constructor(
     private readonly rules: MemoryRules,
@@ -105,7 +103,6 @@ export class MemoryBook {
     entry.count += 1;
     entry.last = nowMs;
     if (detail !== undefined) entry.detail = detail;
-    this.dirty = true;
   }
 
   /** 種類 kind の出来事の回数。place を省くと、すべての場所の合計 */

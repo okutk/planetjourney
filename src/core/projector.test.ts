@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canUpgrade, MAX_FRAGMENT_STAGE, nextStageCost, STAGE_COSTS } from './projector';
+import { canUpgrade, MAX_FRAGMENT_STAGE, nextStageCost, spentFragments, STAGE_COSTS } from './projector';
 
 describe('projector', () => {
   it('段階ごとの費用を返し、かけらで上げられる最大の段階より上は null', () => {
@@ -14,5 +14,12 @@ describe('projector', () => {
     expect(canUpgrade(0, STAGE_COSTS[0] - 1)).toBe(false);
     expect(canUpgrade(0, STAGE_COSTS[0])).toBe(true);
     expect(canUpgrade(MAX_FRAGMENT_STAGE, 100)).toBe(false);
+  });
+
+  it('段階までに使ったかけらの合計を返し、最大より上の段階でも増えない', () => {
+    expect(spentFragments(0)).toBe(0);
+    expect(spentFragments(1)).toBe(STAGE_COSTS[0]);
+    expect(spentFragments(MAX_FRAGMENT_STAGE)).toBe(STAGE_COSTS.reduce((sum, cost) => sum + cost, 0));
+    expect(spentFragments(MAX_FRAGMENT_STAGE + 1)).toBe(spentFragments(MAX_FRAGMENT_STAGE));
   });
 });

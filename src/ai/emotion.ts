@@ -76,6 +76,19 @@ export function parseEmotionRules(data: unknown): EmotionRules {
   return raw as unknown as EmotionRules;
 }
 
+/** 保存から読んだ感情の値を確かめて返す。4 つの感情がすべて有限の数でなければ null（0〜100 に収める） */
+export function parseEmotionValues(data: unknown): EmotionValues | null {
+  if (typeof data !== 'object' || data === null) return null;
+  const saved = data as Record<string, unknown>;
+  const values = {} as EmotionValues;
+  for (const name of EMOTION_NAMES) {
+    const value = saved[name];
+    if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+    values[name] = clamp(value);
+  }
+  return values;
+}
+
 /** 感情の気分。平常値からいちばん大きく上がっている感情（信頼は除く）。どれも上がっていなければ calm */
 export type Mood = 'joyful' | 'curious' | 'anxious' | 'calm';
 

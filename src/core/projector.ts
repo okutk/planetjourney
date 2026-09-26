@@ -13,6 +13,13 @@ export function nextStageCost(stage: number): number | null {
   return stage >= 0 && stage < MAX_FRAGMENT_STAGE ? STAGE_COSTS[stage] : null;
 }
 
+/** その段階まで上げるのに使ったかけらの合計（セーブから手持ちを求めるのに使う） */
+export function spentFragments(stage: number): number {
+  let spent = 0;
+  for (let i = 0; i < Math.min(stage, MAX_FRAGMENT_STAGE); i++) spent += STAGE_COSTS[i];
+  return spent;
+}
+
 /** いまの段階と手持ちのかけらで、次の段階に上げられるか。 */
 export function canUpgrade(stage: number, fragments: number): boolean {
   const cost = nextStageCost(stage);

@@ -18,7 +18,6 @@ describe('MemoryBook', () => {
     expect(book.count('jump')).toBe(0);
     const entry = book.toJSON().entries[0];
     expect(entry).toEqual({ kind: 'leftBehind', place: 'ocean', count: 2, first: T0, last: T0 + DAY, detail: '浮島' });
-    expect(book.dirty).toBe(true);
   });
 
   it('その場所で起きたことを here_〇〇 として書き、別の場所の分は消す', () => {
@@ -75,7 +74,6 @@ describe('MemoryBook', () => {
     const saved = JSON.parse(JSON.stringify(book.toJSON()));
     const restored = new MemoryBook(rules, parseMemory(saved));
     expect(restored.count('sit', 'ship')).toBe(1);
-    expect(restored.dirty).toBe(false);
 
     expect(parseMemory(null).entries).toEqual([]);
     expect(parseMemory({ version: 2, entries: [] }).entries).toEqual([]);
