@@ -1,5 +1,7 @@
 import {
+  BoxGeometry,
   BufferGeometry,
+  CapsuleGeometry,
   Color,
   ConeGeometry,
   DirectionalLight,
@@ -17,12 +19,19 @@ import {
   WebGLRenderer,
 } from 'three';
 import { alignToUp, upAt } from './core/sphere';
+import { DEFAULT_WALKER_CONFIG, SphericalWalker, type WalkInput } from './core/walker';
 
-// M0: デプロイ確認用の最小シーン。小さな星がゆっくり回るだけ。
-// 本格的な実装は docs/ROADMAP.md の M1 以降で行う。
+// M1: 球面重力で星の上を歩き、ジャンプできるシーン。
+// 操作は動作確認用の最小限のキーボード（W/S: 前後、A/D: 向きを変える、Space: ジャンプ）。
+// タッチ操作・三人称カメラ・地形は別のテーマで入れる。
 
 const PLANET_RADIUS = 5;
 const MAX_PIXEL_RATIO = 2; // スマホで描画負荷が跳ね上がらないよう上限を設ける
+const MAX_DT = 1 / 30; // タブ復帰などで dt が跳ねても地面を突き抜けないよう上限を設ける
+const TURN_SPEED = 2.5; // 向きを変える速さ（ラジアン/秒）
+const CAMERA_DISTANCE = 7;
+const CAMERA_HEIGHT = 4;
+const CAMERA_DAMPING = 6; // 大きいほどカメラがすぐ追いつく
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
 const renderer = new WebGLRenderer({ canvas, antialias: true });
@@ -32,36 +41,54 @@ const scene = new Scene();
 scene.background = new Color('#0b1026');
 
 const camera = new PerspectiveCamera(50, 1, 0.1, 500);
-camera.position.set(0, 4, 16);
-camera.lookAt(0, 0, 0);
 
 scene.add(new HemisphereLight('#bcd4ff', '#2a1f3d', 0.9));
 const sun = new DirectionalLight('#fff2d6', 2.2);
 sun.position.set(8, 10, 6);
 scene.add(sun);
 
-const planet = new Group();
-scene.add(planet);
+// 後片付け用に、作ったジオメトリとマテリアルを覚えておく
+const disposables: { dispose(): void }[] = [];
+function track<T extends { dispose(): void }>(resource: T): T {
+  disposables.push(resource);
+  return resource;
+}
 
-planet.add(
+const planetCenter = new Vector3();
+scene.add(
   new Mesh(
-    new IcosahedronGeometry(PLANET_RADIUS, 3),
-    new MeshStandardMaterial({ color: '#7fcf8a', flatShading: true }),
+    track(new IcosahedronGeometry(PLANET_RADIUS, 3)),
+    track(new MeshStandardMaterial({ color: '#7fcf8a', flatShading: true })),
   ),
 );
 
-// 地表に木を立てて、球面に沿った配置（upAt / alignToUp）の動作確認を兼ねる
-const treeGeometry = new ConeGeometry(0.35, 1.2, 6);
+// 地表の木。歩いたときに進んでいることが分かる目印を兼ねる
+const treeGeometry = track(new ConeGeometry(0.35, 1.2, 6));
 treeGeometry.translate(0, 0.6, 0);
-const treeMaterial = new MeshStandardMaterial({ color: '#2f7a4b', flatShading: true });
-const center = new Vector3();
+const treeMaterial = track(new MeshStandardMaterial({ color: '#2f7a4b', flatShading: true }));
 for (let i = 0; i < 24; i++) {
   const direction = new Vector3().randomDirection();
   const tree = new Mesh(treeGeometry, treeMaterial);
   tree.position.copy(direction).multiplyScalar(PLANET_RADIUS * 0.97);
-  tree.quaternion.copy(alignToUp(upAt(tree.position, center)));
-  planet.add(tree);
+  tree.quaternion.copy(alignToUp(upAt(tree.position, planetCenter)));
+  scene.add(tree);
 }
+
+// プレイヤー（仮の見た目）。足元が原点、+Z が正面。向きが分かるよう正面に目印を付ける
+const player = new Group();
+const bodyGeometry = track(new CapsuleGeometry(0.3, 0.6, 4, 8));
+bodyGeometry.translate(0, 0.6, 0);
+player.add(new Mesh(bodyGeometry, track(new MeshStandardMaterial({ color: '#f4c7d8' }))));
+const noseGeometry = track(new BoxGeometry(0.2, 0.12, 0.2));
+noseGeometry.translate(0, 0.9, 0.3);
+player.add(new Mesh(noseGeometry, track(new MeshStandardMaterial({ color: '#40325c' }))));
+scene.add(player);
+
+const walker = new SphericalWalker({
+  ...DEFAULT_WALKER_CONFIG,
+  center: planetCenter,
+  planetRadius: PLANET_RADIUS,
+});
 
 scene.add(createStarField(800, 120));
 
@@ -72,10 +99,33 @@ function createStarField(count: number, radius: number): Points {
     p.randomDirection().multiplyScalar(radius);
     positions.push(p.x, p.y, p.z);
   }
-  const geometry = new BufferGeometry();
+  const geometry = track(new BufferGeometry());
   geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
-  return new Points(geometry, new PointsMaterial({ color: '#ffffff', size: 0.6 }));
+  return new Points(geometry, track(new PointsMaterial({ color: '#ffffff', size: 0.6 })));
 }
+
+// キーボード入力（動作確認用）
+const pressed = new Set<string>();
+let jumpRequested = false;
+function onKeyDown(event: KeyboardEvent): void {
+  pressed.add(event.code);
+  if (event.code === 'Space') {
+    if (!event.repeat) jumpRequested = true;
+    event.preventDefault();
+  }
+}
+function onKeyUp(event: KeyboardEvent): void {
+  pressed.delete(event.code);
+}
+function onBlur(): void {
+  pressed.clear();
+}
+function axis(positive: string, negative: string): number {
+  return (pressed.has(positive) ? 1 : 0) - (pressed.has(negative) ? 1 : 0);
+}
+window.addEventListener('keydown', onKeyDown);
+window.addEventListener('keyup', onKeyUp);
+window.addEventListener('blur', onBlur);
 
 function resize(): void {
   const { clientWidth: width, clientHeight: height } = canvas;
@@ -86,8 +136,51 @@ function resize(): void {
 window.addEventListener('resize', resize);
 resize();
 
+// カメラはプレイヤーの後ろ上から追う（毎フレーム new しないよう使い回す）
+const cameraGoal = new Vector3();
+const cameraTarget = new Vector3();
+function cameraGoalFor(out: Vector3): Vector3 {
+  return out
+    .copy(walker.position)
+    .addScaledVector(walker.up, CAMERA_HEIGHT)
+    .addScaledVector(walker.forward, -CAMERA_DISTANCE);
+}
+function updateCamera(dt: number): void {
+  cameraGoalFor(cameraGoal);
+  const t = 1 - Math.exp(-CAMERA_DAMPING * dt);
+  camera.position.lerp(cameraGoal, t);
+  camera.up.lerp(walker.up, t).normalize();
+  cameraTarget.copy(walker.position).addScaledVector(walker.up, 1);
+  camera.lookAt(cameraTarget);
+}
+camera.position.copy(cameraGoalFor(cameraGoal));
+camera.up.copy(walker.up);
+
+const input: WalkInput = { forward: 0, right: 0, jump: false };
+let lastTime: number | undefined;
 renderer.setAnimationLoop((time) => {
-  planet.rotation.y = time * 0.0001;
-  planet.rotation.x = Math.sin(time * 0.00005) * 0.2;
+  const dt = lastTime === undefined ? 0 : Math.min((time - lastTime) / 1000, MAX_DT);
+  lastTime = time;
+
+  walker.turn(axis('KeyA', 'KeyD') * TURN_SPEED * dt);
+  input.forward = axis('KeyW', 'KeyS');
+  input.jump = jumpRequested;
+  jumpRequested = false;
+  walker.step(input, dt);
+
+  player.position.copy(walker.position);
+  walker.orientation(player.quaternion);
+  updateCamera(dt);
   renderer.render(scene, camera);
+});
+
+// 開発サーバーのホットリロードでシーンを作り直すときに、古いものを片付ける
+import.meta.hot?.dispose(() => {
+  renderer.setAnimationLoop(null);
+  window.removeEventListener('keydown', onKeyDown);
+  window.removeEventListener('keyup', onKeyUp);
+  window.removeEventListener('blur', onBlur);
+  window.removeEventListener('resize', resize);
+  for (const resource of disposables) resource.dispose();
+  renderer.dispose();
 });
