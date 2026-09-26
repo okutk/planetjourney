@@ -32,6 +32,8 @@ export interface MotionClips {
 
 /** 待機と歩きの混ざり方が切り替わる速さ（大きいほどすぐ切り替わる） */
 const BLEND_RATE = 8;
+/** 歩きクリップの再生速度の下限（歩く量 0 のとき）。全力で 1 倍 */
+const MIN_WALK_TIME_SCALE = 0.5;
 
 export class MiraMotion {
   private readonly mixer: AnimationMixer;
@@ -55,6 +57,8 @@ export class MiraMotion {
   update(dt: number, walkAmount: number): void {
     const target = Math.min(1, Math.max(0, walkAmount));
     this.walkWeight += (target - this.walkWeight) * (1 - Math.exp(-BLEND_RATE * dt));
+    // 脚の周期を移動の速さに合わせる（足が床を滑って見えないように）。ゆっくりでも止まって見えない下限を置く
+    this.walk.setEffectiveTimeScale(MIN_WALK_TIME_SCALE + (1 - MIN_WALK_TIME_SCALE) * target);
     this.apply();
     this.mixer.update(dt);
   }
@@ -122,12 +126,14 @@ function buildClip(
     tracks.push(new QuaternionKeyframeTrack(`${node.name}.quaternion`, times, values));
   }
   const hips = vrm.humanoid.getNormalizedBoneNode('hips');
-  if (hips) {
+  // 腰の基準は休止姿勢（three-vrm が構築時に記録したもの）。再生中に呼んでも弾んだ高さが焼き込まれない
+  const rest = vrm.humanoid.normalizedRestPose.hips?.position;
+  if (hips && rest) {
     const values = new Float32Array((SAMPLES + 1) * 3);
     poses.forEach((pose, i) => {
-      values[i * 3] = hips.position.x;
-      values[i * 3 + 1] = hips.position.y + pose.hipsBob;
-      values[i * 3 + 2] = hips.position.z;
+      values[i * 3] = rest[0];
+      values[i * 3 + 1] = rest[1] + pose.hipsBob;
+      values[i * 3 + 2] = rest[2];
     });
     tracks.push(new VectorKeyframeTrack(`${hips.name}.position`, times, values));
   }

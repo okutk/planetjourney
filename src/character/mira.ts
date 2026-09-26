@@ -100,6 +100,8 @@ export class MiraView {
     this.clips = clips;
     if (this.vrm) {
       this.motion?.dispose();
+      // 前のクリップが動かしていたボーンの姿勢が残らないよう、休止姿勢に戻してから差し替える
+      this.vrm.humanoid.resetNormalizedPose();
       this.motion = new MiraMotion(this.vrm.scene, clips);
     }
   }
