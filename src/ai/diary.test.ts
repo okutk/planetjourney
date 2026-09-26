@@ -56,6 +56,10 @@ describe('writeDiary', () => {
     expect(text).not.toContain('初めての');
   });
 
+  it('まだ日記がないときの文も、文法に置いてある', () => {
+    expect(expand('empty', grammar, {}, () => 0)).toContain('書くね');
+  });
+
   it('何もなかった日でも、始まりと終わりの 2 段落は書く', () => {
     const lines = writeDiary(grammar, visitFacts(), () => 0).split('\n');
     expect(lines.length).toBe(2);

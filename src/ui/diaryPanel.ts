@@ -15,6 +15,8 @@ export class DiaryPanel {
   constructor(
     parent: HTMLElement,
     private readonly pages: readonly DiaryEntry[],
+    /** まだ 1 ページもないときの文（ミラのセリフなので src/data/diary.json の empty から渡す） */
+    private readonly emptyText: string,
     /** 開いたとき（新しいページを読んだことにする） */
     private readonly onRead: () => void,
   ) {
@@ -56,7 +58,7 @@ export class DiaryPanel {
     this.list.replaceChildren();
     if (this.pages.length === 0) {
       const empty = document.createElement('p');
-      empty.textContent = 'まだ何も書いていない。星から帰ってきたら書くね。';
+      empty.textContent = this.emptyText;
       this.list.append(empty);
     }
     for (let i = this.pages.length - 1; i >= 0; i--) {

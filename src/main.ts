@@ -20,7 +20,7 @@ import { DialogueSelector, parseRules } from './ai/dialogue';
 import { nextPlayLog } from './ai/clock';
 import { Emotion, emotionalStride, emotionVoice, moodFace, parseEmotionRules } from './ai/emotion';
 import { Codex, parseCodex } from './ai/codex';
-import { DIARY_LIMIT, parseDiaryGrammar, writeDiary, type DiaryEntry } from './ai/diary';
+import { DIARY_LIMIT, expand, parseDiaryGrammar, writeDiary, type DiaryEntry } from './ai/diary';
 import { MemoryBook, parseMemoryRules } from './ai/memory';
 import { TalkDirector } from './ai/talk';
 import { pipopaTimeline, DEFAULT_PIPOPA_CONFIG } from './audio/pipopa';
@@ -172,7 +172,7 @@ const talk = new TalkDirector(new DialogueSelector(parseRules(dialogueData), tal
   random: talkRandom,
   codex,
 });
-const diaryPanel = new DiaryPanel(document.body, diary, () => {
+const diaryPanel = new DiaryPanel(document.body, diary, expand('empty', diaryGrammar, {}, talkRandom), () => {
   delete talk.facts.diaryNew;
 });
 /** いまの星での出来事から日記を 1 ページ書く。星から船へ移るとき（talk.enterShip() の前）に呼ぶ */
