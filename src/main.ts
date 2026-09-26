@@ -19,11 +19,13 @@ import {
 import { DialogueSelector, parseRules } from './ai/dialogue';
 import { nextPlayLog } from './ai/clock';
 import { Emotion, emotionalStride, emotionVoice, moodFace, parseEmotionRules } from './ai/emotion';
+import { MemoryBook, parseMemoryRules } from './ai/memory';
 import { TalkDirector } from './ai/talk';
 import { pipopaTimeline, DEFAULT_PIPOPA_CONFIG } from './audio/pipopa';
 import { VoicePlayer } from './audio/voicePlayer';
 import { createRandom } from './core/noise';
 import dialogueData from './data/dialogue.json';
+import memoryData from './data/memory.json';
 import emotionData from './data/emotion.json';
 import { SpeechBubble } from './ui/speechBubble';
 import { BehaviorSelector, Curiosity, type Behavior, type Perception } from './ai/behavior';
@@ -137,17 +139,24 @@ function speechDuration(text: string): number {
   const { revealAt } = pipopaTimeline(text, config);
   return (revealAt.at(-1) ?? 0) + config.charInterval;
 }
-const talk = new TalkDirector(
-  new DialogueSelector(parseRules(dialogueData), createRandom(Date.now())),
-  speechDuration,
-  emotion,
-);
-
-// セーブとロード。旅の進み（Journey）・ミラの感情・前回のプレイ日時を端末内に残す（src/ai/save.ts）。
+// セーブとロード。旅の進み（Journey）・ミラの感情・記憶・前回のプレイ日時を端末内に残す（src/ai/save.ts）。
 // 読めない・壊れている保存は初めてから。起動はいつも船の部屋からで、窓には最後に降りた星が見える
 const SAVE_KEY = 'save';
-const journey = new Journey();
 const loaded = parseSaveData(localStore.load(SAVE_KEY));
+
+// ミラの記憶（src/data/memory.json）。出来事を覚えてセーブに残し、会話の条件と思い出話にする
+const memoryRules = parseMemoryRules(memoryData);
+const memory = new MemoryBook(memoryRules, loaded?.memory);
+const talkRandom = createRandom(Date.now());
+const talk = new TalkDirector(new DialogueSelector(parseRules(dialogueData), talkRandom), speechDuration, emotion, {
+  book: memory,
+  reminisceAfter: memoryRules.reminisceAfter,
+  nowMs: () => Date.now(),
+  nameOf: (place) => (place === 'ship' ? '船' : (PLANETS.find((p) => p.id === place)?.name ?? place)),
+  random: talkRandom,
+});
+
+const journey = new Journey();
 if (loaded) {
   journey.restore(loaded.journey);
   if (loaded.emotion) {
@@ -159,7 +168,13 @@ if (loaded) {
 let playLog = loaded?.playLog ?? null;
 /** いまの状態を保存する。旅が変わったとき（降りる・解く・拾う・強化）と、時刻を記録するときに呼ぶ */
 function saveGame(): void {
-  const data: SaveData = { version: SAVE_VERSION, journey: journey.snapshot(), emotion: emotion.snapshot(), playLog };
+  const data: SaveData = {
+    version: SAVE_VERSION,
+    journey: journey.snapshot(),
+    emotion: emotion.snapshot(),
+    playLog,
+    memory: memory.toJSON(),
+  };
   localStore.save(SAVE_KEY, data);
 }
 
@@ -695,7 +710,7 @@ renderer.setAnimationLoop((time) => {
   miraWalker.step(miraInput, dt);
   // 投影範囲。消え切った瞬間に、腕輪のそば（定位置）へ映し直す
   if (projector.update(walker.position.distanceTo(miraWalker.position), dt)) {
-    emotion.feel('leftBehind'); // 置いていかれて、少し不安になる
+    talk.leftBehind(); // 置いていかれて少し不安になり、そのことを覚える
     stage.reprojectMira();
     placeMira();
     mira.settle();
