@@ -89,3 +89,14 @@ body {
     display: none;
   }
 }
+
+/* 性能の表示（?debug のときだけ） */
+.perf-overlay {
+  position: fixed;
+  top: max(36px, calc(env(safe-area-inset-top) + 24px));
+  left: max(16px, env(safe-area-inset-left));
+  color: #e8ecff;
+  font: 12px ui-monospace, monospace;
+  opacity: 0.8;
+  pointer-events: none;
+}

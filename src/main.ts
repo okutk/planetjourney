@@ -19,6 +19,7 @@ import {
 import { DEFAULT_ORBIT_CAMERA_CONFIG, OrbitCamera } from './core/orbitCamera';
 import { Terrain } from './core/terrain';
 import { DEFAULT_WALKER_CONFIG, SphericalWalker, type WalkInput } from './core/walker';
+import { PerfOverlay } from './ui/perfOverlay';
 import { TouchControls } from './ui/touchControls';
 import { PlanetView } from './world/planet';
 
@@ -149,6 +150,11 @@ function updateCamera(dt: number): void {
 camera.position.copy(orbit.eye(walker.position, walker.up, cameraGoal));
 camera.up.copy(walker.up);
 
+// URL に ?debug を付けると、性能（fps・ドローコール数など）を表示する
+const perf = new URLSearchParams(window.location.search).has('debug')
+  ? new PerfOverlay(document.body, renderer)
+  : null;
+
 const input: WalkInput = { forward: 0, right: 0, jump: false };
 let lastTime: number | undefined;
 renderer.setAnimationLoop((time) => {
@@ -185,4 +191,5 @@ renderer.setAnimationLoop((time) => {
   walker.orientation(player.quaternion);
   updateCamera(dt);
   renderer.render(scene, camera);
+  perf?.update(dt);
 });

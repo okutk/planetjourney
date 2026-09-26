@@ -3,8 +3,10 @@ import {
   DodecahedronGeometry,
   Group,
   IcosahedronGeometry,
+  InstancedMesh,
   Mesh,
   MeshStandardMaterial,
+  Object3D,
   Vector3,
   type BufferGeometry,
   type Material,
@@ -32,6 +34,7 @@ export class PlanetView {
   readonly group = new Group();
   private readonly geometries: BufferGeometry[] = [];
   private readonly materials: Material[] = [];
+  private readonly instanced: InstancedMesh[] = [];
 
   constructor(terrain: Terrain, look: PlanetLookConfig) {
     this.group.add(this.createGround(terrain, look));
@@ -41,6 +44,7 @@ export class PlanetView {
   dispose(): void {
     for (const geometry of this.geometries) geometry.dispose();
     for (const material of this.materials) material.dispose();
+    for (const mesh of this.instanced) mesh.dispose();
     this.group.removeFromParent();
   }
 
@@ -62,31 +66,41 @@ export class PlanetView {
   private scatterProps(terrain: Terrain, look: PlanetLookConfig): void {
     const random = createRandom(look.seed);
     const create = () => new Vector3();
-    const place = (mesh: Mesh, direction: Vector3, sink: number) => {
-      mesh.position.copy(direction).multiplyScalar(terrain.radiusAt(direction) - sink);
-      mesh.quaternion.copy(alignToUp(direction));
-      this.group.add(mesh);
+    // 同じ形の配置物は InstancedMesh にまとめ、1 回の描画（ドローコール）で描く
+    const dummy = new Object3D();
+    const place = (direction: Vector3, sink: number) => {
+      dummy.position.copy(direction).multiplyScalar(terrain.radiusAt(direction) - sink);
+      dummy.quaternion.copy(alignToUp(direction));
     };
 
     // 木（円すい）。高さに少しばらつきを持たせる
     const treeGeometry = this.track(new ConeGeometry(0.35, 1.2, 6));
     treeGeometry.translate(0, 0.6, 0);
     const treeMaterial = this.track(new MeshStandardMaterial({ color: '#2f7a4b', flatShading: true }));
-    for (const direction of scatterDirections(look.treeCount, random, look.spawn, look.spawnClearance, create)) {
-      const tree = new Mesh(treeGeometry, treeMaterial);
-      tree.scale.setScalar(0.7 + random() * 0.6);
-      place(tree, direction, 0.05);
-    }
+    const treeDirections = scatterDirections(look.treeCount, random, look.spawn, look.spawnClearance, create);
+    const trees = new InstancedMesh(treeGeometry, treeMaterial, treeDirections.length);
+    treeDirections.forEach((direction, i) => {
+      dummy.scale.setScalar(0.7 + random() * 0.6);
+      place(direction, 0.05);
+      dummy.updateMatrix();
+      trees.setMatrixAt(i, dummy.matrix);
+    });
+    this.group.add(trees);
 
     // 岩（つぶした十二面体）。地面に少し埋めて置く
     const rockGeometry = this.track(new DodecahedronGeometry(0.3, 0));
     const rockMaterial = this.track(new MeshStandardMaterial({ color: '#8a8fa3', flatShading: true }));
-    for (const direction of scatterDirections(look.rockCount, random, look.spawn, look.spawnClearance, create)) {
-      const rock = new Mesh(rockGeometry, rockMaterial);
-      rock.scale.set(0.8 + random() * 0.8, 0.5 + random() * 0.4, 0.8 + random() * 0.8);
-      place(rock, direction, 0.08);
-      rock.rotateY(random() * Math.PI * 2);
-    }
+    const rockDirections = scatterDirections(look.rockCount, random, look.spawn, look.spawnClearance, create);
+    const rocks = new InstancedMesh(rockGeometry, rockMaterial, rockDirections.length);
+    rockDirections.forEach((direction, i) => {
+      dummy.scale.set(0.8 + random() * 0.8, 0.5 + random() * 0.4, 0.8 + random() * 0.8);
+      place(direction, 0.08);
+      dummy.rotateY(random() * Math.PI * 2);
+      dummy.updateMatrix();
+      rocks.setMatrixAt(i, dummy.matrix);
+    });
+    this.group.add(rocks);
+    this.instanced.push(trees, rocks);
   }
 
   private track<T extends BufferGeometry | Material>(resource: T): T {
