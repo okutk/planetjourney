@@ -113,11 +113,14 @@ export class TalkDirector {
   announceDiscovery(now: number): DialogueLine | null {
     const codex = this.memory?.codex;
     if (!codex || now < this.busyUntil + MIN_GAP) return null;
-    const entry = codex.next();
+    // 話せたときだけ順番待ちから外す（話せなければ、次の機会にまた話す）
+    const entry = codex.peek();
     if (!entry) return null;
     this.facts.codexTitle = entry.title;
     this.facts.codexRare = entry.rare === true;
-    return this.say('codex', now);
+    const line = this.say('codex', now);
+    if (line) codex.next();
+    return line;
   }
 
   /** プレイヤーが離れすぎて、ミラが映し直されたとき（置いていかれた） */

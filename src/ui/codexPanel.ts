@@ -57,7 +57,8 @@ export class CodexPanel {
 
   /** 開く。開くたびに、いまの体験の状態で作り直す（項目は少ないので十分軽い） */
   open(): void {
-    const { entries } = this.codex;
+    // データにない発見は、体験するまで並べず、数にも入れない
+    const entries = this.codex.visibleEntries();
     this.summary.textContent = `体験 ${this.codex.count} / ${entries.length}`;
     this.list.replaceChildren();
     let section: HTMLElement | null = null;

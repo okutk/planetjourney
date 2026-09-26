@@ -52,6 +52,19 @@ describe('Codex', () => {
     expect(codex.next()).toBe(gravity);
   });
 
+  it('データにない発見は、体験するまで図鑑に並ばない', () => {
+    const memory = new MemoryBook(memoryRules);
+    const codex = new Codex(entries, memory);
+    const island = entries.find((e) => e.rare)!;
+    expect(codex.visibleEntries()).not.toContain(island);
+    expect(codex.visibleEntries().length).toBe(entries.filter((e) => !e.rare).length);
+    memory.record(island.when.kind, island.when.place, T0);
+    codex.check();
+    expect(codex.visibleEntries()).toContain(island);
+    expect(codex.peek()).toBe(island);
+    expect(codex.next()).toBe(island); // peek は取り出さない
+  });
+
   it('起動時にすでに体験していた項目は、新しい発見として話さない', () => {
     const memory = new MemoryBook(memoryRules);
     memory.record('landed', 'origin', T0);

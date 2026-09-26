@@ -81,9 +81,21 @@ export class Codex {
     }
   }
 
-  /** 話す順番待ちの先頭を取り出す（なければ null） */
+  /** 話す順番待ちの先頭（取り出さない。なければ null） */
+  peek(): CodexEntry | null {
+    return this.pending[0] ?? null;
+  }
+
+  /** 話す順番待ちの先頭を取り出す（なければ null）。話せたあとに呼ぶ */
   next(): CodexEntry | null {
     return this.pending.shift() ?? null;
+  }
+
+  /**
+   * 図鑑に並べる項目。データにない発見（rare）は、体験するまで名前も並べない（ミラも知らないので）
+   */
+  visibleEntries(): CodexEntry[] {
+    return this.entries.filter((entry) => !entry.rare || this.experienced.has(entry));
   }
 
   has(entry: CodexEntry): boolean {
