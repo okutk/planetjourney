@@ -5,7 +5,7 @@ const STICK_DEAD_ZONE = 0.15;
 const CAMERA_DRAG_SPEED = 0.008; // ドラッグ 1px あたりのカメラの回転（ラジアン）
 
 /**
- * タッチ操作。画面の左半分は押した場所に出る仮想スティック、右半分のドラッグはカメラの回転、
+ * タッチ操作。画面の左半分は押した場所に出る仮想スティック、右半分のドラッグはカメラの回転（上下で見下ろす角度）、
  * 右下のボタンでジャンプ。Pointer Events なのでマウスでも同じように動く。
  */
 export class TouchControls {
@@ -20,7 +20,9 @@ export class TouchControls {
   private stickOriginY = 0;
   private cameraPointer: number | null = null;
   private cameraLastX = 0;
+  private cameraLastY = 0;
   private yaw = 0;
+  private pitch = 0;
   private jump = false;
 
   constructor(
@@ -43,6 +45,7 @@ export class TouchControls {
     surface.addEventListener('pointermove', this.onPointerMove);
     surface.addEventListener('pointerup', this.onPointerUp);
     surface.addEventListener('pointercancel', this.onPointerUp);
+    surface.addEventListener('contextmenu', this.onContextMenu);
     this.jumpButton.addEventListener('pointerdown', this.onJumpDown);
   }
 
@@ -51,6 +54,13 @@ export class TouchControls {
     const yaw = this.yaw;
     this.yaw = 0;
     return yaw;
+  }
+
+  /** 前回呼んでからの見下ろす角度の変化（ラジアン。下へのドラッグで正）を取り出す。 */
+  consumePitch(): number {
+    const pitch = this.pitch;
+    this.pitch = 0;
+    return pitch;
   }
 
   /** ジャンプボタンが押されたかを取り出す（1 回押すと 1 回だけ true）。 */
@@ -74,12 +84,15 @@ export class TouchControls {
     this.surface.removeEventListener('pointermove', this.onPointerMove);
     this.surface.removeEventListener('pointerup', this.onPointerUp);
     this.surface.removeEventListener('pointercancel', this.onPointerUp);
+    this.surface.removeEventListener('contextmenu', this.onContextMenu);
     this.jumpButton.removeEventListener('pointerdown', this.onJumpDown);
     this.stickBase.remove();
     this.jumpButton.remove();
   }
 
   private readonly onPointerDown = (event: PointerEvent): void => {
+    // マウスは主ボタンだけ使う（右クリックのメニューに pointerup を取られて押しっぱなしになるのを防ぐ）
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
     const onLeft = event.clientX < this.layer.clientWidth / 2;
     if (onLeft && this.stickPointer === null) {
       this.stickPointer = event.pointerId;
@@ -91,6 +104,7 @@ export class TouchControls {
     } else if (!onLeft && this.cameraPointer === null) {
       this.cameraPointer = event.pointerId;
       this.cameraLastX = event.clientX;
+      this.cameraLastY = event.clientY;
     } else {
       return;
     }
@@ -103,7 +117,9 @@ export class TouchControls {
       this.updateStick(event);
     } else if (event.pointerId === this.cameraPointer) {
       this.yaw += (event.clientX - this.cameraLastX) * CAMERA_DRAG_SPEED;
+      this.pitch += (event.clientY - this.cameraLastY) * CAMERA_DRAG_SPEED;
       this.cameraLastX = event.clientX;
+      this.cameraLastY = event.clientY;
     }
   };
 
@@ -116,6 +132,10 @@ export class TouchControls {
     } else if (event.pointerId === this.cameraPointer) {
       this.cameraPointer = null;
     }
+  };
+
+  private readonly onContextMenu = (event: Event): void => {
+    event.preventDefault();
   };
 
   private readonly onJumpDown = (event: PointerEvent): void => {
