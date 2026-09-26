@@ -230,7 +230,8 @@ function onKeyDown(event: KeyboardEvent): void {
     if (!event.repeat) jumpRequested = true;
     event.preventDefault();
   } else if (event.code === 'KeyE' || event.code === 'Enter') {
-    if (!event.repeat) actionRequested = true;
+    // 星図の中の操作はボタン自身の click に任せる（Enter で「閉じる」を押した直後に開き直さないように）
+    if (!event.repeat && !starMap.isOpen) actionRequested = true;
   } else if (event.code === 'Escape') {
     starMap.close();
   }
@@ -406,7 +407,8 @@ renderer.setAnimationLoop((time) => {
     // あいさつ待ち
   } else if (wasGrounded && !walker.grounded && input.jump) {
     say(talk.jumped(now), now);
-  } else {
+  } else if (!paused) {
+    // 星図を見ている間とワープ中は「放っておかれている」わけではないので、放置の時間を進めない
     say(talk.update(dt, amount > 0, now), now);
   }
 
