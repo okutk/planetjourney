@@ -1,11 +1,62 @@
-import { canUpgrade, nextStageCost } from './projector';
+import { canUpgrade, MAX_FRAGMENT_STAGE, nextStageCost, spentFragments } from './projector';
 
 /** いまいる場所。船の部屋か、どれかの星。 */
 export type Place = 'ship' | 'planet';
 
 /**
+ * 旅の保存の形（JSON にそのまま書けるプレーンなオブジェクト）。
+ * 手持ちのかけらは保存せず、拾った数と段階から求める（食い違った保存を作らないため）。
+ */
+export interface JourneySave {
+  place: Place;
+  planet: string | null;
+  /** 星の id → 降りた回数 */
+  landings: Record<string, number>;
+  /** 解いた仕掛け（"星の id/仕掛けの id"） */
+  solved: string[];
+  /** かけらを拾った仕掛け（"星の id/仕掛けの id"） */
+  collected: string[];
+  stage: number;
+}
+
+function isCount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
+}
+
+function isKeyList(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((key) => typeof key === 'string' && key.includes('/'));
+}
+
+/**
+ * 保存から読んだ値を確かめて返す。形がおかしければ null（旅を初めからにする）。
+ * 段階に使った数より拾ったかけらが少ない保存は、手持ちが負になるので受け付けない。
+ */
+export function parseJourneySave(data: unknown): JourneySave | null {
+  if (typeof data !== 'object' || data === null) return null;
+  const { place, planet, landings, solved, collected, stage } = data as Record<string, unknown>;
+  if (place !== 'ship' && place !== 'planet') return null;
+  if (planet !== null && typeof planet !== 'string') return null;
+  if (place === 'planet' && planet === null) return null;
+  if (typeof landings !== 'object' || landings === null || Array.isArray(landings)) return null;
+  const counts = Object.entries(landings as Record<string, unknown>);
+  if (!counts.every(([, count]) => isCount(count) && count > 0)) return null;
+  if (!isKeyList(solved) || !isKeyList(collected)) return null;
+  // 段階の上限はかけらで上げられる最大。段階 4（機械の廃墟星の物語）を足すときは、ここの上限も上げること
+  if (!isCount(stage) || stage > MAX_FRAGMENT_STAGE) return null;
+  if (new Set(collected).size < spentFragments(stage)) return null;
+  return {
+    place,
+    planet,
+    landings: Object.fromEntries(counts) as Record<string, number>,
+    solved: [...new Set(solved)],
+    collected: [...new Set(collected)],
+    stage,
+  };
+}
+
+/**
  * 旅の状態。いま船にいるか星にいるかと、それぞれの星に何回降りたかを数える。
- * 描画や DOM には依存しない。あとでセーブデータの元になる。
+ * 描画や DOM には依存しない。セーブデータの元（snapshot() / restore()）。
  */
 export class Journey {
   place: Place = 'ship';
@@ -89,6 +140,32 @@ export class Journey {
   get fragmentsNeeded(): number | null {
     const cost = nextStageCost(this.stage);
     return cost === null ? null : Math.max(0, cost - this.fragments);
+  }
+
+  /** 保存用の値（コピー）。parseJourneySave() で確かめてから restore() で戻せる */
+  snapshot(): JourneySave {
+    return {
+      place: this.place,
+      planet: this.planet,
+      landings: Object.fromEntries(this.landings),
+      solved: [...this.solved],
+      collected: [...this.collected],
+      stage: this._stage,
+    };
+  }
+
+  /** 確かめた保存の値で旅を置き換える。手持ちのかけらは、拾った数から段階に使った数を引いて求める */
+  restore(save: JourneySave): void {
+    this.place = save.place;
+    this.planet = save.planet;
+    this.landings.clear();
+    for (const [planet, count] of Object.entries(save.landings)) this.landings.set(planet, count);
+    this.solved.clear();
+    for (const key of save.solved) this.solved.add(key);
+    this.collected.clear();
+    for (const key of save.collected) this.collected.add(key);
+    this._stage = save.stage;
+    this._fragments = this.collected.size - spentFragments(save.stage);
   }
 
   /** かけらを使って投影機の段階を 1 つ上げる。足りなければ何もせず false。 */
