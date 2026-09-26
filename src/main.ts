@@ -50,6 +50,7 @@ import { DEFAULT_WALKER_CONFIG, SphericalWalker, type Walker, type WalkInput } f
 import { DEFAULT_WARP_CONFIG, WarpSequence } from './core/warp';
 import planetsData from './data/planets.json';
 import { FADE_SECONDS, Fader } from './ui/fade';
+import { registerServiceWorker } from './pwa/register';
 import { localStore } from './ui/localStore';
 import { PerfOverlay } from './ui/perfOverlay';
 import { StarMapPanel } from './ui/starMap';
@@ -646,6 +647,8 @@ function updateBehavior(dt: number, walker: Walker, miraWalker: Walker): void {
 refreshStatus();
 mira.setSolidity(journey.stage / MAX_FRAGMENT_STAGE);
 enterStage(shipStage);
+// PWA: 本番ビルドではサービスワーカーを登録し、次からはオフラインでも起動できるようにする
+registerServiceWorker();
 
 const input: WalkInput = { forward: 0, right: 0, jump: false };
 let lastTime: number | undefined;
