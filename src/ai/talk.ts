@@ -8,22 +8,30 @@ const MIN_GAP = 1.5;
  * 話している途中は、次のセリフで割り込まない。
  */
 export class TalkDirector {
-  /** 会話の判断材料。セリフの {名前} にも使う */
-  readonly facts: Record<string, FactValue> = { visits: 1, jumps: 0, idleSeconds: 0, affection: 20 };
+  /** 会話の判断材料。セリフの {名前} にも使う。place は 'ship'（船の部屋）か 'planet'（星の上） */
+  readonly facts: Record<string, FactValue> = { place: 'ship', jumps: 0, idleSeconds: 0, affection: 20 };
   private busyUntil = -Infinity;
 
   constructor(
     private readonly selector: DialogueSelector,
     /** セリフを話し終えるまでの秒数（文字送り・音の長さに合わせる） */
     private readonly durationOf: (text: string) => number,
-    planet: string,
-  ) {
+  ) {}
+
+  /** 星に着いたとき。visits はその星に降りた回数（初めてなら 1）。 */
+  arrive(now: number, planet: string, visits: number): DialogueLine | null {
+    this.facts.place = 'planet';
     this.facts.planet = planet;
+    this.facts.visits = visits;
+    this.facts.idleSeconds = 0;
+    return this.say('greet', now);
   }
 
-  /** 星に着いたとき。 */
-  arrive(now: number): DialogueLine | null {
-    return this.say('greet', now);
+  /** 船の部屋に入ったとき（旅の始まりと、星から戻ったとき）。planet には最後に降りた星が残る。 */
+  board(now: number): DialogueLine | null {
+    this.facts.place = 'ship';
+    this.facts.idleSeconds = 0;
+    return this.say('board', now);
   }
 
   /** プレイヤーがジャンプしたとき。 */
@@ -41,6 +49,11 @@ export class TalkDirector {
     // セリフの条件は秒単位なので、判定は 1 秒に 1 回で十分（毎フレーム候補の配列を作らない）
     if (moving || Math.floor(after) === Math.floor(before)) return null;
     return this.say('idle', now);
+  }
+
+  /** 話している途中のセリフを打ち切る（場所を移るとき）。すぐ次のセリフを話せるようになる。 */
+  interrupt(): void {
+    this.busyUntil = -Infinity;
   }
 
   /** いま話しているか。 */

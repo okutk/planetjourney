@@ -7,8 +7,8 @@ const WHEEL_ZOOM_SPEED = 0.001; // ホイール 1 単位あたりのズーム（
 
 /**
  * タッチ操作。画面の左半分は押した場所に出る仮想スティック、右半分のドラッグはカメラの回転（上下で見下ろす角度）、
- * 右下のボタンでジャンプ。マウスでは、画面のどこをドラッグしてもカメラが回り、ホイールでズームする
- * （マウスの移動はキーボードで行う）。
+ * 右下のボタンでジャンプ。調べられる物の近くでは、その上に「調べる」ボタンが出る。
+ * マウスでは、画面のどこをドラッグしてもカメラが回り、ホイールでズームする（マウスの移動はキーボードで行う）。
  */
 export class TouchControls {
   /** 仮想スティックの値（触れていなければ 0） */
@@ -17,6 +17,7 @@ export class TouchControls {
   private readonly stickBase: HTMLDivElement;
   private readonly stickKnob: HTMLDivElement;
   private readonly jumpButton: HTMLButtonElement;
+  private readonly actionButton: HTMLButtonElement;
   private stickPointer: number | null = null;
   private stickOriginX = 0;
   private stickOriginY = 0;
@@ -27,6 +28,7 @@ export class TouchControls {
   private pitch = 0;
   private zoom = 1;
   private jump = false;
+  private action = false;
 
   constructor(
     private readonly surface: HTMLElement,
@@ -42,7 +44,11 @@ export class TouchControls {
     this.jumpButton.type = 'button';
     this.jumpButton.textContent = 'ジャンプ';
     this.jumpButton.setAttribute('aria-label', 'ジャンプ');
-    layer.append(this.stickBase, this.jumpButton);
+    this.actionButton = document.createElement('button');
+    this.actionButton.className = 'action-button';
+    this.actionButton.type = 'button';
+    this.actionButton.hidden = true;
+    layer.append(this.stickBase, this.jumpButton, this.actionButton);
 
     surface.addEventListener('pointerdown', this.onPointerDown);
     surface.addEventListener('pointermove', this.onPointerMove);
@@ -51,6 +57,7 @@ export class TouchControls {
     surface.addEventListener('contextmenu', this.onContextMenu);
     surface.addEventListener('wheel', this.onWheel, { passive: false });
     this.jumpButton.addEventListener('pointerdown', this.onJumpDown);
+    this.actionButton.addEventListener('pointerdown', this.onActionDown);
   }
 
   /** 前回呼んでからのカメラの回転量（ラジアン。右へのドラッグで正）を取り出す。 */
@@ -81,6 +88,24 @@ export class TouchControls {
     return jump;
   }
 
+  /** 「調べる」ボタンが押されたかを取り出す（1 回押すと 1 回だけ true）。 */
+  consumeAction(): boolean {
+    const action = this.action;
+    this.action = false;
+    return action;
+  }
+
+  /** 「調べる」ボタンの文言を変える。null なら隠す（近くに調べられる物がないとき）。 */
+  setAction(label: string | null): void {
+    // 毎フレーム呼ばれるので、変わったときだけ DOM を書きかえる
+    if (label === null) {
+      if (!this.actionButton.hidden) this.actionButton.hidden = true;
+      return;
+    }
+    if (this.actionButton.textContent !== label) this.actionButton.textContent = label;
+    if (this.actionButton.hidden) this.actionButton.hidden = false;
+  }
+
   /** 画面から離れたとき（タブ切り替えなど）に入力を離す。 */
   release(): void {
     this.stickPointer = null;
@@ -98,8 +123,10 @@ export class TouchControls {
     this.surface.removeEventListener('contextmenu', this.onContextMenu);
     this.surface.removeEventListener('wheel', this.onWheel);
     this.jumpButton.removeEventListener('pointerdown', this.onJumpDown);
+    this.actionButton.removeEventListener('pointerdown', this.onActionDown);
     this.stickBase.remove();
     this.jumpButton.remove();
+    this.actionButton.remove();
   }
 
   private readonly onPointerDown = (event: PointerEvent): void => {
@@ -166,6 +193,11 @@ export class TouchControls {
   private readonly onJumpDown = (event: PointerEvent): void => {
     event.preventDefault();
     this.jump = true;
+  };
+
+  private readonly onActionDown = (event: PointerEvent): void => {
+    event.preventDefault();
+    this.action = true;
   };
 
   private updateStick(event: PointerEvent): void {

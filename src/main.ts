@@ -25,29 +25,43 @@ import dialogueData from './data/dialogue.json';
 import { SpeechBubble } from './ui/speechBubble';
 import { DEFAULT_FOLLOW_CONFIG, followIntent, followSlot, type FollowIntent } from './ai/companion';
 import { MiraPlaceholder } from './character/miraPlaceholder';
+import { Journey } from './core/journey';
 import { DEFAULT_ORBIT_CAMERA_CONFIG, OrbitCamera } from './core/orbitCamera';
+import { RoomWalker } from './core/roomWalker';
 import { Terrain } from './core/terrain';
-import { DEFAULT_WALKER_CONFIG, SphericalWalker, type WalkInput } from './core/walker';
+import { DEFAULT_WALKER_CONFIG, SphericalWalker, type Walker, type WalkInput } from './core/walker';
+import { Fader } from './ui/fade';
 import { PerfOverlay } from './ui/perfOverlay';
 import { TouchControls } from './ui/touchControls';
+import { LandingPod } from './world/landingPod';
 import { PlanetView } from './world/planet';
+import { SHIP_ROOM, ShipRoomView } from './world/shipRoom';
 
-// M1: 「はじまりの星」の上を、球面重力で歩いてジャンプできるシーン。
+// M3: 船の部屋（拠点）と「はじまりの星」を行き来する。
+// 船の部屋は星のそばに浮かんでいて、窓から星が見える。星図の台に近づいて「出発」すると星に降り、
+// 星の上では着陸ポッドのそばで「船に戻る」と部屋へ戻る。
 // 操作（移動はカメラから見た向き。プレイヤーは進む方向へ向き直る）
-//   タッチ: 左半分に仮想スティック、右半分のドラッグでカメラを回す（上下で見下ろす角度）、右下のボタンでジャンプ
-//   キーボード・マウス（補助）: WASD で移動、Space でジャンプ、矢印キーかマウスのドラッグでカメラを回す、
-//   ホイールでズーム
+//   タッチ: 左半分に仮想スティック、右半分のドラッグでカメラを回す（上下で見下ろす角度）、右下のボタンでジャンプ、
+//   調べられる物の近くではその上に「出発」「船に戻る」のボタン
+//   キーボード・マウス（補助）: WASD で移動、Space でジャンプ、E か Enter で調べる、矢印キーかマウスのドラッグで
+//   カメラを回す、ホイールでズーム
 // シーンはページと同じ寿命なので、後片付けはページの破棄（開発時はフルリロード）に任せる。
 
+const PLANET_NAME = 'はじまりの星';
 const PLANET_RADIUS = 5;
+const SHIP_POSITION = new Vector3(0, -1.5, 20); // 船の部屋の床の中心。窓（-Z 側）から星が見える距離
 const MAX_PIXEL_RATIO = 2; // スマホで描画負荷が跳ね上がらないよう上限を設ける
 const MAX_DT = 1 / 30; // タブ復帰などで dt が跳ねても地面を突き抜けないよう上限を設ける
 const TURN_SPEED = 12; // プレイヤーが進む方向へ向き直る速さ（ラジアン/秒）
 const MIRA_WALK_SPEED = 5.5; // プレイヤーより少し速く、離されても追いつける
 const CAMERA_DAMPING = 6; // 大きいほどカメラがすぐ追いつく
 const KEY_CAMERA_SPEED = 2; // 矢印キーでカメラを回す速さ（ラジアン/秒）
+const BODY_RADIUS = 0.3; // プレイヤーの体の太さ（壁や台にめり込まない距離）
+const ACTION_RADIUS = 1.4; // 調べられる物から、この距離まで近づくとボタンが出る
+const ARRIVE_TALK_DELAY = 1; // 場所に入ってから話し始めるまで（秒）
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
+const hud = document.querySelector<HTMLElement>('#hud')!;
 const renderer = new WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
 
@@ -64,6 +78,8 @@ scene.add(sun);
 // 「はじまりの星」。地形は歩く処理と見た目で同じものを使う
 const planetCenter = new Vector3();
 const SPAWN_DIRECTION = new Vector3(0, 1, 0);
+// 着陸ポッドは出現位置の少し後ろ（-Z 側）。降りた直後は目の前ではなく、振り返ると見える
+const POD_DIRECTION = new Vector3(0, Math.cos(0.3), -Math.sin(0.3));
 const terrain = new Terrain({ radius: PLANET_RADIUS, amplitude: 0.5, frequency: 1.3, octaves: 3, seed: 1 });
 const planet = new PlanetView(terrain, {
   detail: 16,
@@ -72,13 +88,20 @@ const planet = new PlanetView(terrain, {
   rockCount: 18,
   seed: 2,
   spawn: SPAWN_DIRECTION,
-  spawnClearance: 0.25,
+  spawnClearance: 0.45,
 });
 scene.add(planet.group);
+const pod = new LandingPod(terrain, POD_DIRECTION);
+scene.add(pod.group);
+
+// 船の部屋。星のそばに浮かべ、星の上にいるあいだは隠す
+const shipRoom = new ShipRoomView();
+shipRoom.group.position.copy(SHIP_POSITION);
+scene.add(shipRoom.group);
 
 // プレイヤー（仮の見た目）。足元が原点、+Z が正面。向きが分かるよう正面に目印を付ける
 const player = new Group();
-const bodyGeometry = new CapsuleGeometry(0.3, 0.6, 4, 8);
+const bodyGeometry = new CapsuleGeometry(BODY_RADIUS, 0.6, 4, 8);
 bodyGeometry.translate(0, 0.6, 0);
 player.add(new Mesh(bodyGeometry, new MeshStandardMaterial({ color: '#f4c7d8' })));
 const noseGeometry = new BoxGeometry(0.2, 0.12, 0.2);
@@ -86,32 +109,91 @@ noseGeometry.translate(0, 0.9, 0.3);
 player.add(new Mesh(noseGeometry, new MeshStandardMaterial({ color: '#40325c' })));
 scene.add(player);
 
-const walker = new SphericalWalker({
-  ...DEFAULT_WALKER_CONFIG,
-  center: planetCenter,
-  planetRadius: PLANET_RADIUS,
-  surfaceRadius: (up) => terrain.radiusAt(up),
-});
-// 出現位置は、配置物をあけておく方向と同じにする
-walker.placeAt(SPAWN_DIRECTION, new Vector3(0, 0, 1));
-
-// ミラ（仮の見た目）。プレイヤーの斜め後ろの定位置を目指して、同じ球面重力で歩く
+// ミラ（仮の見た目）。プレイヤーの斜め後ろの定位置を目指して、プレイヤーと同じ歩き方でついてくる
 const mira = new MiraPlaceholder();
 scene.add(mira.group);
-const miraWalker = new SphericalWalker({
-  ...DEFAULT_WALKER_CONFIG,
-  walkSpeed: MIRA_WALK_SPEED,
-  center: planetCenter,
-  planetRadius: PLANET_RADIUS,
-  surfaceRadius: (up) => terrain.radiusAt(up),
-});
-// 最初からプレイヤーの斜め後ろの定位置に立たせる（出現方向を変えても一緒に動く）
-miraWalker.placeAt(
-  followSlot(walker, DEFAULT_FOLLOW_CONFIG, new Vector3()).sub(planetCenter),
-  walker.forward,
-);
 const miraIntent: FollowIntent = { direction: new Vector3(), amount: 0 };
 const miraInput: WalkInput = { forward: 0, right: 0, jump: false };
+
+// 場所ごとの歩き手。星は球面重力、船の部屋は平らな床
+const sphericalConfig = {
+  ...DEFAULT_WALKER_CONFIG,
+  center: planetCenter,
+  planetRadius: PLANET_RADIUS,
+  surfaceRadius: (up: Vector3) => terrain.radiusAt(up),
+};
+const roomConfig = {
+  ...DEFAULT_WALKER_CONFIG,
+  origin: SHIP_POSITION,
+  halfWidth: SHIP_ROOM.halfWidth - BODY_RADIUS,
+  halfDepth: SHIP_ROOM.halfDepth - BODY_RADIUS,
+  obstacles: [SHIP_ROOM.console],
+};
+
+/** 場所（船の部屋・星）。それぞれの歩き手と、調べられる物を持つ */
+interface Stage {
+  readonly walker: Walker;
+  readonly mira: Walker;
+  /** 調べられる物の位置（ワールド座標）と、近づいたときのボタンの文言 */
+  readonly spot: Vector3;
+  readonly spotLabel: string;
+  /** この場所に入ったとき。プレイヤーとミラを出現位置に置く */
+  enter(): void;
+  /** 入ってしばらくしてから話すあいさつ */
+  greet(now: number): void;
+  /** ボタンが押されたとき（暗転の先で次の場所へ移る） */
+  act(): void;
+}
+
+const journey = new Journey();
+let planetVisits = 0; // いまの星に降りた回数（あいさつの選び方に使う）
+
+const shipWalker = new RoomWalker(roomConfig);
+const shipMira = new RoomWalker({ ...roomConfig, walkSpeed: MIRA_WALK_SPEED });
+const shipStage: Stage = {
+  walker: shipWalker,
+  mira: shipMira,
+  spot: new Vector3(SHIP_ROOM.console.x, 0, SHIP_ROOM.console.z).add(SHIP_POSITION),
+  spotLabel: '出発',
+  enter() {
+    hud.textContent = '船の部屋';
+    shipRoom.group.visible = true;
+    journey.board();
+    // 窓（-Z 側）の方を向いて、部屋の奥に立つ
+    shipWalker.placeAt(0, 1.5, new Vector3(0, 0, -1));
+    const slot = followSlot(shipWalker, DEFAULT_FOLLOW_CONFIG, new Vector3()).sub(SHIP_POSITION);
+    shipMira.placeAt(slot.x, slot.z, shipWalker.forward);
+  },
+  greet(now) {
+    say(talk.board(now), now);
+  },
+  act() {
+    switchTo(planetStage);
+  },
+};
+
+const planetWalker = new SphericalWalker(sphericalConfig);
+const planetMira = new SphericalWalker({ ...sphericalConfig, walkSpeed: MIRA_WALK_SPEED });
+const planetStage: Stage = {
+  walker: planetWalker,
+  mira: planetMira,
+  spot: pod.position,
+  spotLabel: '船に戻る',
+  enter() {
+    hud.textContent = PLANET_NAME;
+    shipRoom.group.visible = false;
+    planetVisits = journey.land(PLANET_NAME);
+    planetWalker.placeAt(SPAWN_DIRECTION, new Vector3(0, 0, 1));
+    const slot = followSlot(planetWalker, DEFAULT_FOLLOW_CONFIG, new Vector3()).sub(planetCenter);
+    planetMira.placeAt(slot, planetWalker.forward);
+  },
+  greet(now) {
+    say(talk.arrive(now, PLANET_NAME, planetVisits), now);
+  },
+  act() {
+    switchTo(shipStage);
+  },
+};
 
 scene.add(createStarField(800, 120));
 
@@ -130,11 +212,14 @@ function createStarField(count: number, radius: number): Points {
 // キーボード入力（補助）
 const pressed = new Set<string>();
 let jumpRequested = false;
+let actionRequested = false;
 function onKeyDown(event: KeyboardEvent): void {
   pressed.add(event.code);
   if (event.code === 'Space') {
     if (!event.repeat) jumpRequested = true;
     event.preventDefault();
+  } else if (event.code === 'KeyE' || event.code === 'Enter') {
+    if (!event.repeat) actionRequested = true;
   }
 }
 function onKeyUp(event: KeyboardEvent): void {
@@ -163,20 +248,18 @@ resize();
 
 // 三人称カメラ。向きはプレイヤーと一緒に運び、歩いているとしばらくして後ろへ回り込む。
 // 実際のカメラは目標の位置へ減衰付きで追いかける（毎フレーム new しないよう使い回す）
-const orbit = new OrbitCamera(DEFAULT_ORBIT_CAMERA_CONFIG, walker.forward, walker.up);
+let orbit: OrbitCamera;
 const cameraRight = new Vector3();
 const cameraGoal = new Vector3();
 const cameraTarget = new Vector3();
 const moveDirection = new Vector3();
-function updateCamera(dt: number): void {
+function updateCamera(walker: Walker, dt: number): void {
   orbit.eye(walker.position, walker.up, cameraGoal);
   const t = 1 - Math.exp(-CAMERA_DAMPING * dt);
   camera.position.lerp(cameraGoal, t);
   camera.up.lerp(walker.up, t).normalize();
   camera.lookAt(orbit.target(walker.position, walker.up, cameraTarget));
 }
-camera.position.copy(orbit.eye(walker.position, walker.up, cameraGoal));
-camera.up.copy(walker.up);
 
 // URL に ?debug を付けると、性能（fps・ドローコール数など）を表示する
 const perf = new URLSearchParams(window.location.search).has('debug')
@@ -184,15 +267,10 @@ const perf = new URLSearchParams(window.location.search).has('debug')
   : null;
 
 // ミラの会話。セリフは src/data/dialogue.json から条件で選び、吹き出しとピポパ音声で話す
-const ARRIVE_TALK_DELAY = 1; // 着いてから話し始めるまで（秒）
-const talk = new TalkDirector(
-  new DialogueSelector(parseRules(dialogueData), createRandom(Date.now())),
-  (text) => {
-    const { revealAt } = pipopaTimeline(text);
-    return (revealAt.at(-1) ?? 0) + DEFAULT_PIPOPA_CONFIG.charInterval;
-  },
-  'はじまりの星',
-);
+const talk = new TalkDirector(new DialogueSelector(parseRules(dialogueData), createRandom(Date.now())), (text) => {
+  const { revealAt } = pipopaTimeline(text);
+  return (revealAt.at(-1) ?? 0) + DEFAULT_PIPOPA_CONFIG.charInterval;
+});
 const voice = new VoicePlayer();
 const bubble = new SpeechBubble(document.body);
 // 音はユーザーが画面に触れる（キーを押す）まで鳴らせないので、最初の操作で準備する。
@@ -201,13 +279,36 @@ const unlockVoice = () => voice.unlock();
 for (const type of ['pointerdown', 'pointerup', 'touchend', 'keydown']) {
   window.addEventListener(type, unlockVoice);
 }
-function speak(text: string, now: number): void {
-  const { beeps, revealAt } = pipopaTimeline(text);
+function say(line: { text: string } | null, now: number): void {
+  if (!line) return;
+  const { beeps, revealAt } = pipopaTimeline(line.text);
   voice.play(beeps);
-  bubble.show(text, revealAt, now);
+  bubble.show(line.text, revealAt, now);
 }
-let arrived = false;
 const bubbleAnchor = new Vector3();
+
+// 場所の切り替え。暗転の途中で入れ替え、カメラは新しい場所の後ろへ飛ばす
+const fader = new Fader(document.body);
+let stage: Stage;
+let greetAt = Infinity; // この時刻になったら、入った場所のあいさつをする
+let elapsed = 0; // ゲームを始めてからの秒数（あいさつの時刻に使う）
+function enterStage(next: Stage): void {
+  stage = next;
+  stage.enter();
+  touch.release();
+  // 話している途中のセリフは打ち切る（新しい場所のあいさつを言えるように）
+  talk.interrupt();
+  voice.stop();
+  bubble.hide();
+  orbit = new OrbitCamera(DEFAULT_ORBIT_CAMERA_CONFIG, stage.walker.forward, stage.walker.up);
+  camera.position.copy(orbit.eye(stage.walker.position, stage.walker.up, cameraGoal));
+  camera.up.copy(stage.walker.up);
+  greetAt = elapsed + ARRIVE_TALK_DELAY;
+}
+function switchTo(next: Stage): void {
+  fader.run(() => enterStage(next));
+}
+enterStage(shipStage);
 
 const input: WalkInput = { forward: 0, right: 0, jump: false };
 let lastTime: number | undefined;
@@ -216,6 +317,8 @@ renderer.setAnimationLoop((time) => {
   const rawDt = lastTime === undefined ? 0 : (time - lastTime) / 1000;
   const dt = Math.min(rawDt, MAX_DT);
   lastTime = time;
+  elapsed += dt;
+  const { walker, mira: miraWalker } = stage;
 
   orbit.rotate(
     touch.consumeYaw() + axis('ArrowRight', 'ArrowLeft') * KEY_CAMERA_SPEED * dt,
@@ -249,21 +352,29 @@ renderer.setAnimationLoop((time) => {
   miraInput.forward = miraIntent.amount;
   miraWalker.step(miraInput, dt);
 
-  // 会話: 着いたとき・ジャンプしたとき・しばらく放っておかれたとき
+  // 調べられる物（星図の台・着陸ポッド）の近くでボタンを出し、押されたら場所を移る
+  const nearSpot = !fader.busy && walker.position.distanceTo(stage.spot) < ACTION_RADIUS;
+  touch.setAction(nearSpot ? stage.spotLabel : null);
+  const action = touch.consumeAction() || actionRequested;
+  actionRequested = false;
+  if (nearSpot && action) stage.act();
+
+  // 会話: 場所に入ったとき・ジャンプしたとき・しばらく放っておかれたとき
   const now = time / 1000;
-  const line =
-    !arrived && now > ARRIVE_TALK_DELAY
-      ? ((arrived = true), talk.arrive(now))
-      : wasGrounded && !walker.grounded && input.jump
-        ? talk.jumped(now)
-        : talk.update(dt, amount > 0, now);
-  if (line) speak(line.text, now);
+  if (elapsed >= greetAt) {
+    greetAt = Infinity;
+    stage.greet(now);
+  } else if (wasGrounded && !walker.grounded && input.jump) {
+    say(talk.jumped(now), now);
+  } else {
+    say(talk.update(dt, amount > 0, now), now);
+  }
 
   player.position.copy(walker.position);
   walker.orientation(player.quaternion);
   mira.group.position.copy(miraWalker.position);
   miraWalker.orientation(mira.group.quaternion);
-  updateCamera(dt);
+  updateCamera(walker, dt);
   renderer.render(scene, camera);
 
   // 吹き出しはミラの頭の上に出す（画面の外やカメラの後ろなら隠す）
