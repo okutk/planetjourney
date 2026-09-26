@@ -39,6 +39,11 @@ export interface DialogueLine {
 }
 
 const OPERATORS: readonly Operator[] = ['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'exists', 'missing'];
+const RULE_KEYS = new Set(['id', 'concept', 'criteria', 'lines', 'cooldown', 'once']);
+
+function isFactValue(value: unknown): value is FactValue {
+  return typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean';
+}
 
 /** 条件が成り立つか。 */
 export function matches(criterion: Criterion, facts: Facts): boolean {
@@ -78,6 +83,10 @@ export function parseRules(data: unknown): DialogueRule[] {
   return data.map((raw, index) => {
     const rule = raw as Partial<DialogueRule>;
     const where = `会話ルール ${index}（${String(rule?.id)}）`;
+    // キーの打ち間違い（cooldwon など）は、指定が黙って効かなくなるので例外にする
+    for (const key of Object.keys(rule ?? {})) {
+      if (!RULE_KEYS.has(key)) throw new Error(`${where}: 知らないキー ${key}`);
+    }
     if (typeof rule?.id !== 'string' || rule.id === '') throw new Error(`${where}: id がない`);
     if (ids.has(rule.id)) throw new Error(`${where}: id が重複している`);
     ids.add(rule.id);
@@ -85,15 +94,21 @@ export function parseRules(data: unknown): DialogueRule[] {
     if (!Array.isArray(rule.lines) || rule.lines.length === 0 || rule.lines.some((l) => typeof l !== 'string')) {
       throw new Error(`${where}: lines は 1 つ以上の文字列`);
     }
+    if (new Set(rule.lines).size !== rule.lines.length) throw new Error(`${where}: lines に同じセリフが重複している`);
     if (!Array.isArray(rule.criteria)) throw new Error(`${where}: criteria は配列`);
     for (const c of rule.criteria) {
       if (typeof c?.fact !== 'string' || !OPERATORS.includes(c.op)) {
         throw new Error(`${where}: 条件の fact か op がおかしい`);
       }
       const needsValue = c.op !== 'exists' && c.op !== 'missing';
-      if (needsValue && c.value === undefined) throw new Error(`${where}: ${c.fact} の条件に value がない`);
+      if (needsValue && !isFactValue(c.value)) {
+        throw new Error(`${where}: ${c.fact} の条件の value は数・文字列・真偽のどれか`);
+      }
     }
-    if (rule.cooldown !== undefined && !(rule.cooldown >= 0)) throw new Error(`${where}: cooldown は 0 以上`);
+    if (rule.cooldown !== undefined && !(typeof rule.cooldown === 'number' && rule.cooldown >= 0)) {
+      throw new Error(`${where}: cooldown は 0 以上の数`);
+    }
+    if (rule.once !== undefined && typeof rule.once !== 'boolean') throw new Error(`${where}: once は真偽`);
     return rule as DialogueRule;
   });
 }
@@ -160,7 +175,8 @@ export class DialogueSelector {
   /** 候補のセリフから 1 つ選ぶ。候補が 2 つ以上あれば、前回と同じセリフは避ける。 */
   private pickLine(rule: DialogueRule): string {
     const previous = this.lastLineOf.get(rule.id);
-    const choices = rule.lines.length > 1 ? rule.lines.filter((line) => line !== previous) : rule.lines;
+    const filtered = rule.lines.filter((line) => line !== previous);
+    const choices = filtered.length > 0 ? filtered : rule.lines;
     return choices[Math.floor(this.random() * choices.length)];
   }
 }

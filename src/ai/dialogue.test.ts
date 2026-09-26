@@ -115,6 +115,14 @@ describe('parseRules', () => {
       parseRules([{ id: 'b', concept: 'x', criteria: [{ fact: 'n', op: 'gte' }], lines: ['1'] }]),
     ).toThrow('value');
     expect(() =>
+      parseRules([{ id: 'd', concept: 'x', criteria: [{ fact: 'n', op: 'eq', value: null }], lines: ['1'] }]),
+    ).toThrow('value');
+    expect(() => parseRules([{ id: 'e', concept: 'x', criteria: [], lines: ['1', '1'] }])).toThrow('重複');
+    expect(() => parseRules([{ id: 'f', concept: 'x', criteria: [], lines: ['1'], cooldwon: 5 }])).toThrow(
+      'cooldwon',
+    );
+    expect(() => parseRules([{ id: 'g', concept: 'x', criteria: [], lines: ['1'], once: 'true' }])).toThrow('once');
+    expect(() =>
       parseRules([{ id: 'c', concept: 'x', criteria: [{ fact: 'n', op: 'like', value: 1 }], lines: ['1'] }]),
     ).toThrow('op');
   });
@@ -125,6 +133,13 @@ describe('src/data/dialogue.json', () => {
 
   it('形が正しい', () => {
     expect(rules.length).toBeGreaterThan(0);
+  });
+
+  it('初めて着いたときは、必ず初回のセリフになる（同点で乱数に回らない）', () => {
+    for (let seed = 0; seed < 50; seed++) {
+      const selector = new DialogueSelector(rules, createRandom(seed));
+      expect(selector.select('greet', { visits: 1, planet: 'はじまりの星' }, 0)?.ruleId).toBe('greet.first');
+    }
   });
 
   it('セリフの {名前} は、そのルールの条件で必ずある事実だけを使う', () => {

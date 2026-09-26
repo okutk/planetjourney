@@ -7,6 +7,10 @@
         "fact": "visits",
         "op": "eq",
         "value": 1
+      },
+      {
+        "fact": "planet",
+        "op": "exists"
       }
     ],
     "lines": [
