@@ -20,6 +20,8 @@ export function precacheList(files: Iterable<string>): string[] {
   const set = new Set<string>(['index.html']);
   for (const file of files) {
     const path = file.replace(/\\/g, '/').replace(/^\.?\//, '');
+    // 空白や ?・# が入る名前は、サービスワーカー側の new URL() が別の URL に読むので受け付けない
+    if (/[\s?#%]/.test(path)) throw new Error(`取り込むファイルの名前に使えない文字がある: ${path}`);
     if (path && !EXCLUDED.has(path)) set.add(path);
   }
   return [...set].sort();
@@ -38,5 +40,7 @@ export function precacheEntries(files: string[], revisionOf: (path: string) => s
 /** テンプレートの __PRECACHE__ と __VERSION__ を埋めて、サービスワーカーの本文を作る */
 export function renderServiceWorker(template: string, entries: PrecacheEntry[], version: string): string {
   if (!/^[\w.-]+$/.test(version)) throw new Error(`版の文字列に使えない文字がある: ${version}`);
-  return template.replaceAll('__PRECACHE__', JSON.stringify(entries)).replaceAll('__VERSION__', version);
+  // 置換に関数を渡し、置換文字列の $& や $1 が特別扱いされないようにする（$ を含む名前でも壊れない）
+  const json = JSON.stringify(entries);
+  return template.replaceAll('__PRECACHE__', () => json).replaceAll('__VERSION__', () => version);
 }

@@ -38,9 +38,10 @@ function offlineCsp(): Plugin {
   };
 }
 
-/** ディレクトリの中のファイルを、そこからの相対パスで並べる */
+/** ディレクトリの中のファイルを、そこからの相対パスで並べる（.DS_Store などのドットファイルは除く） */
 function listFiles(dir: string, base = dir): string[] {
   return readdirSync(dir).flatMap((name: string) => {
+    if (name.startsWith('.')) return [];
     const path = join(dir, name);
     return statSync(path).isDirectory() ? listFiles(path, base) : [relative(base, path)];
   });
@@ -57,18 +58,25 @@ function digest(...parts: (string | Uint8Array)[]): string {
 // 名前に版が入らないファイル（index.html・public のファイル）には中身の版を付け、キャッシュの版は一覧全体から決める。
 // 何か変われば新しいキャッシュになるが、版が同じファイルは古いキャッシュから移すので取り直さない。
 function serviceWorker(): Plugin {
+  let root = '';
+  let publicDir = '';
   return {
     name: 'service-worker',
     apply: 'build',
     enforce: 'post',
+    configResolved(config) {
+      // process.cwd() ではなく Vite が解決した root と publicDir を使う（--root や別のディレクトリからの実行でも動く）
+      root = config.root;
+      publicDir = config.publicDir;
+    },
     generateBundle(_options, bundle) {
-      const files = precacheList([...Object.keys(bundle), ...listFiles('public')]);
+      const files = precacheList([...Object.keys(bundle), ...(publicDir ? listFiles(publicDir) : [])]);
       const entries = precacheEntries(files, (file) => {
         const emitted = bundle[file];
         if (emitted) return digest(emitted.type === 'asset' ? emitted.source : emitted.code);
-        return digest(readFileSync(join('public', file)));
+        return digest(readFileSync(join(publicDir, file)));
       });
-      const template = readFileSync('src/pwa/sw.js', 'utf8');
+      const template = readFileSync(join(root, 'src/pwa/sw.js'), 'utf8');
       this.emitFile({ type: 'asset', fileName: 'sw.js', source: renderServiceWorker(template, entries, digest(JSON.stringify(entries))) });
     },
   };

@@ -10,6 +10,12 @@ describe('precacheList', () => {
   it('Windows の区切りも / にそろえる', () => {
     expect(precacheList(['icons\\icon-192.png'])).toEqual(['icons/icon-192.png', 'index.html']);
   });
+
+  it('URL として別の意味になる名前は例外にする', () => {
+    expect(() => precacheList(['models/mira 2.vrm'])).toThrow('mira 2');
+    expect(() => precacheList(['a?b.png'])).toThrow();
+    expect(() => precacheList(['a#b.png'])).toThrow();
+  });
 });
 
 describe('precacheEntries', () => {
@@ -31,6 +37,11 @@ describe('renderServiceWorker', () => {
   it('一覧と版をテンプレートに埋める', () => {
     const out = renderServiceWorker("const C = 'pj-__VERSION__';\nconst P = __PRECACHE__;", [{ url: 'a.js', revision: null }], 'abc123');
     expect(out).toBe("const C = 'pj-abc123';\nconst P = [{\"url\":\"a.js\",\"revision\":null}];");
+  });
+
+  it('$ を含む名前でも置換文字列として解釈しない', () => {
+    const out = renderServiceWorker('__PRECACHE__', [{ url: 'a$&b.png', revision: '$1' }], 'v1');
+    expect(JSON.parse(out)).toEqual([{ url: 'a$&b.png', revision: '$1' }]);
   });
 
   it('版に引用符などが混ざっていれば例外にする（スクリプトを壊さない）', () => {
