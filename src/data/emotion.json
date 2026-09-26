@@ -7,6 +7,8 @@
     "home": { "anxiety": -15, "joy": 5, "trust": 1 },
     "warp": { "curiosity": 15, "anxiety": 10 },
     "jump": { "joy": 3 },
+    "solve": { "joy": 12, "curiosity": 5, "trust": 2 },
+    "cancel": { "joy": -5, "anxiety": 5 },
     "ignored": { "joy": -10, "anxiety": 10 },
     "leftBehind": { "anxiety": 20, "joy": -5, "trust": -1 }
   }

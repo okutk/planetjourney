@@ -54,12 +54,14 @@ export class TalkDirector {
     this.facts.solved = solved;
     const key = `${String(this.facts.task)}Done`;
     this.facts[key] = ((this.facts[key] as number | undefined) ?? 0) + 1;
+    this.emotion?.feel('solve'); // いっしょに解けたのがうれしい
     this.interrupt();
     return this.say('taskDone', now);
   }
 
   /** プレイヤーが離れて投影が届かず、作業が止まったとき。頼んだ直後でも打ち切って話す。 */
   cancelTask(now: number): DialogueLine | null {
+    this.emotion?.feel('cancel');
     this.interrupt();
     return this.say('taskCancelled', now);
   }

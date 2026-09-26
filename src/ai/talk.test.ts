@@ -161,19 +161,23 @@ describe('TalkDirector', () => {
     director.enterShip(); // 旅の始まりは「帰ってきた」ではない
     expect(emotion.values.anxiety).toBe(emotionRules.baseline.anxiety);
     director.warp(0, 'はじまりの星');
-    director.enterPlanet('はじまりの星', 1);
+    director.enterPlanet('origin', 'はじまりの星', 1);
     expect(emotion.values.curiosity).toBeGreaterThan(emotionRules.baseline.curiosity + 30);
     director.greet(10);
     expect(director.facts.mood).toBe('curious');
     const anxietyBefore = emotion.values.anxiety;
     director.enterShip();
     expect(emotion.values.anxiety).toBeLessThan(anxietyBefore);
+    const trustBefore = emotion.values.trust;
+    director.askTask(20, 'scan', '石碑');
+    director.finishTask(30, 1);
+    expect(emotion.values.trust).toBeGreaterThan(trustBefore);
   });
 
   it('しばらく放っておかれるとさみしくなり、不安なときは不安なセリフを選ぶ', () => {
     const emotion = new Emotion(emotionRules);
     const director = new TalkDirector(new DialogueSelector(rules, createRandom(1)), () => 2, emotion);
-    director.enterPlanet('はじまりの星', 2);
+    director.enterPlanet('origin', 'はじまりの星', 2);
     emotion.feel('leftBehind');
     emotion.feel('leftBehind');
     const joyBefore = emotion.values.joy;

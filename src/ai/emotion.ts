@@ -12,7 +12,17 @@ export type EmotionName = (typeof EMOTION_NAMES)[number];
 export type EmotionValues = Record<EmotionName, number>;
 
 /** 感情を動かす出来事。コードから feel() に渡すものは、ここに並べ、JSON にも同じ名前で書く */
-export const EMOTION_EVENTS = ['discover', 'arrive', 'home', 'warp', 'jump', 'ignored', 'leftBehind'] as const;
+export const EMOTION_EVENTS = [
+  'discover',
+  'arrive',
+  'home',
+  'warp',
+  'jump',
+  'solve',
+  'cancel',
+  'ignored',
+  'leftBehind',
+] as const;
 export type EmotionEvent = (typeof EMOTION_EVENTS)[number];
 
 export interface EmotionRules {
