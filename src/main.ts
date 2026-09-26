@@ -26,28 +26,34 @@ import { SpeechBubble } from './ui/speechBubble';
 import { DEFAULT_FOLLOW_CONFIG, followIntent, followSlot, type FollowIntent } from './ai/companion';
 import { MiraView } from './character/mira';
 import { Journey } from './core/journey';
+import { parsePlanets } from './core/planets';
 import { DEFAULT_ORBIT_CAMERA_CONFIG, OrbitCamera } from './core/orbitCamera';
 import { RoomWalker } from './core/roomWalker';
 import { Terrain } from './core/terrain';
 import { DEFAULT_WALKER_CONFIG, SphericalWalker, type Walker, type WalkInput } from './core/walker';
-import { Fader } from './ui/fade';
+import { DEFAULT_WARP_CONFIG, WarpSequence } from './core/warp';
+import planetsData from './data/planets.json';
+import { FADE_SECONDS, Fader } from './ui/fade';
 import { PerfOverlay } from './ui/perfOverlay';
+import { StarMapPanel } from './ui/starMap';
 import { TouchControls } from './ui/touchControls';
 import { LandingPod } from './world/landingPod';
 import { PlanetView } from './world/planet';
 import { SHIP_ROOM, ShipRoomView } from './world/shipRoom';
+import { WarpStreaks } from './world/warpStreaks';
 
 // M3: 船の部屋（拠点）と「はじまりの星」を行き来する。
-// 船の部屋は星のそばに浮かんでいて、窓から星が見える。星図の台に近づいて「出発」すると星に降り、
+// 船の部屋は星のそばに浮かんでいて、窓から星が見える。星図の台に近づいて「星図」を開き、星を選ぶとワープして降りる。
 // 星の上では着陸ポッドのそばで「船に戻る」と部屋へ戻る。
 // 操作（移動はカメラから見た向き。プレイヤーは進む方向へ向き直る）
 //   タッチ: 左半分に仮想スティック、右半分のドラッグでカメラを回す（上下で見下ろす角度）、右下のボタンでジャンプ、
-//   調べられる物の近くではその上に「出発」「船に戻る」のボタン
+//   調べられる物の近くではその上に「星図」「船に戻る」のボタン
 //   キーボード・マウス（補助）: WASD で移動、Space でジャンプ、E か Enter で調べる、矢印キーかマウスのドラッグで
 //   カメラを回す、ホイールでズーム
 // シーンはページと同じ寿命なので、後片付けはページの破棄（開発時はフルリロード）に任せる。
 
-const PLANET_NAME = 'はじまりの星';
+const PLANETS = parsePlanets(planetsData);
+const ORIGIN = PLANETS[0]; // いまはこの星だけに降りられる（星を増やすのは次のテーマ）
 const PLANET_RADIUS = 5;
 const SHIP_POSITION = new Vector3(0, -1.5, 20); // 船の部屋の床の中心。窓（-Z 側）から星が見える距離
 const MAX_PIXEL_RATIO = 2; // スマホで描画負荷が跳ね上がらないよう上限を設ける
@@ -59,6 +65,7 @@ const KEY_CAMERA_SPEED = 2; // 矢印キーでカメラを回す速さ（ラジ�
 const BODY_RADIUS = 0.3; // プレイヤーの体の太さ（壁や台にめり込まない距離）
 const ACTION_RADIUS = 1.4; // 調べられる物から、この距離まで近づくとボタンが出る
 const ARRIVE_TALK_DELAY = 1; // 場所に入ってから話し始めるまで（秒）
+const WARP_LINE_MARGIN = 0.6; // ワープのセリフを言い切ってから暗転するまでの間（秒）
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
 const hud = document.querySelector<HTMLElement>('#hud')!;
@@ -112,10 +119,12 @@ player.add(new Mesh(noseGeometry, new MeshStandardMaterial({ color: '#40325c' })
 scene.add(player);
 
 // ミラの会話。セリフは src/data/dialogue.json から条件で選び、吹き出しとピポパ音声で話す
-const talk = new TalkDirector(new DialogueSelector(parseRules(dialogueData), createRandom(Date.now())), (text) => {
+/** セリフを話し終えるまでの秒数（文字送り・音の長さに合わせる） */
+function speechDuration(text: string): number {
   const { revealAt } = pipopaTimeline(text);
   return (revealAt.at(-1) ?? 0) + DEFAULT_PIPOPA_CONFIG.charInterval;
-});
+}
+const talk = new TalkDirector(new DialogueSelector(parseRules(dialogueData), createRandom(Date.now())), speechDuration);
 
 // ミラ。VRM を読み込むまでは仮の見た目。プレイヤーの斜め後ろの定位置を目指して、プレイヤーと同じ歩き方でついてくる
 const mira = new MiraView();
@@ -159,7 +168,7 @@ const shipStage: Stage = {
   walker: shipWalker,
   mira: shipMira,
   spot: new Vector3(SHIP_ROOM.console.x, 0, SHIP_ROOM.console.z).add(SHIP_POSITION),
-  spotLabel: '出発',
+  spotLabel: '星図',
   enter() {
     hud.textContent = '船の部屋';
     shipRoom.group.visible = true;
@@ -171,7 +180,9 @@ const shipStage: Stage = {
     shipMira.placeAt(slot.x, slot.z, shipWalker.forward);
   },
   act() {
-    switchTo(planetStage);
+    starMap.open(journey.planet);
+    touch.release();
+    say(talk.openedStarMap(now), now);
   },
 };
 
@@ -183,9 +194,9 @@ const planetStage: Stage = {
   spot: pod.position,
   spotLabel: '船に戻る',
   enter() {
-    hud.textContent = PLANET_NAME;
+    hud.textContent = ORIGIN.name;
     shipRoom.group.visible = false;
-    talk.enterPlanet(PLANET_NAME, journey.land(PLANET_NAME));
+    talk.enterPlanet(ORIGIN.name, journey.land(ORIGIN.id));
     planetWalker.placeAt(SPAWN_DIRECTION, new Vector3(0, 0, 1));
     const slot = followSlot(planetWalker, DEFAULT_FOLLOW_CONFIG, new Vector3()).sub(planetCenter);
     planetMira.placeAt(slot, planetWalker.forward);
@@ -219,7 +230,10 @@ function onKeyDown(event: KeyboardEvent): void {
     if (!event.repeat) jumpRequested = true;
     event.preventDefault();
   } else if (event.code === 'KeyE' || event.code === 'Enter') {
-    if (!event.repeat) actionRequested = true;
+    // 星図の中の操作はボタン自身の click に任せる（Enter で「閉じる」を押した直後に開き直さないように）
+    if (!event.repeat && !starMap.isOpen) actionRequested = true;
+  } else if (event.code === 'Escape') {
+    starMap.close();
   }
 }
 function onKeyUp(event: KeyboardEvent): void {
@@ -286,7 +300,9 @@ const bubbleAnchor = new Vector3();
 const fader = new Fader(document.body);
 let stage: Stage;
 let greetAt = Infinity; // この時刻になったら、入った場所のあいさつをする
-let elapsed = 0; // ゲームを始めてからの秒数（あいさつの時刻に使う）
+// ループの時刻（秒）。会話と吹き出しはすべてこの時計で動く（時計を混ぜると吹き出しが消える）。
+// 起点は requestAnimationFrame の時刻と同じにする（読み込みに時間がかかっても、最初のあいさつまでの間が保たれる）
+let now = performance.now() / 1000;
 function enterStage(next: Stage): void {
   stage = next;
   stage.enter();
@@ -301,15 +317,37 @@ function enterStage(next: Stage): void {
   // ミラは新しい場所に置いてから、髪などの揺れを落ち着かせる（移動前の位置から振り回されないように）
   placeMira();
   mira.settle();
-  greetAt = elapsed + ARRIVE_TALK_DELAY;
+  greetAt = now + ARRIVE_TALK_DELAY;
 }
 function placeMira(): void {
   mira.group.position.copy(stage.mira.position);
   stage.mira.orientation(mira.group.quaternion);
 }
-function switchTo(next: Stage): void {
-  fader.run(() => enterStage(next));
+/** 暗転して next へ移る。すでに暗転中なら移れず false。 */
+function switchTo(next: Stage): boolean {
+  return fader.run(() => enterStage(next));
 }
+
+// 星図とワープ。星図で星を選ぶと、流れる星が強まり、暗転の先で星に降りる
+const warp = new WarpSequence({ ...DEFAULT_WARP_CONFIG, jump: FADE_SECONDS });
+const streaks = new WarpStreaks();
+camera.add(streaks.object);
+scene.add(camera);
+const starMap = new StarMapPanel(
+  document.body,
+  PLANETS,
+  (planet) => {
+    starMap.close();
+    // ワープはプレイヤーが決めた行動なので、星図のセリフの途中でも打ち切って話す。
+    // セリフを言い切ってから暗転するよう、流れる星の時間をセリフの長さまで延ばす
+    talk.interrupt();
+    voice.stop();
+    const line = talk.warp(now, planet.name);
+    say(line, now);
+    warp.start(line ? speechDuration(line.text) + WARP_LINE_MARGIN - FADE_SECONDS : 0);
+  },
+  () => starMap.close(),
+);
 enterStage(shipStage);
 
 const input: WalkInput = { forward: 0, right: 0, jump: false };
@@ -319,7 +357,7 @@ renderer.setAnimationLoop((time) => {
   const rawDt = lastTime === undefined ? 0 : (time - lastTime) / 1000;
   const dt = Math.min(rawDt, MAX_DT);
   lastTime = time;
-  elapsed += dt;
+  now = time / 1000;
   const { walker, mira: miraWalker } = stage;
 
   orbit.rotate(
@@ -329,10 +367,12 @@ renderer.setAnimationLoop((time) => {
   );
   orbit.zoom(touch.consumeZoom());
 
-  // スティック（なければキーボード）の入力を、カメラから見た地表の向きに直す
-  let stickX = touch.stick.x;
-  let stickY = touch.stick.y;
-  if (stickX === 0 && stickY === 0) {
+  // スティック（なければキーボード）の入力を、カメラから見た地表の向きに直す。
+  // 星図を開いている間とワープ中は、動かさない
+  const paused = starMap.isOpen || warp.active;
+  let stickX = paused ? 0 : touch.stick.x;
+  let stickY = paused ? 0 : touch.stick.y;
+  if (!paused && stickX === 0 && stickY === 0) {
     stickX = axis('KeyD', 'KeyA');
     stickY = axis('KeyW', 'KeyS');
   }
@@ -342,7 +382,7 @@ renderer.setAnimationLoop((time) => {
   if (amount > 0) walker.faceTowards(moveDirection, TURN_SPEED * dt);
 
   input.forward = amount;
-  input.jump = jumpRequested || touch.consumeJump();
+  input.jump = (jumpRequested || touch.consumeJump()) && !paused;
   jumpRequested = false;
   const wasGrounded = walker.grounded;
   walker.step(input, dt);
@@ -355,23 +395,27 @@ renderer.setAnimationLoop((time) => {
   miraWalker.step(miraInput, dt);
 
   // 調べられる物（星図の台・着陸ポッド）の近くでボタンを出し、押されたら場所を移る
-  const nearSpot = !fader.busy && walker.position.distanceTo(stage.spot) < ACTION_RADIUS;
+  const nearSpot = !fader.busy && !paused && walker.position.distanceTo(stage.spot) < ACTION_RADIUS;
   touch.setAction(nearSpot ? stage.spotLabel : null);
   const action = touch.consumeAction() || actionRequested;
   actionRequested = false;
   if (nearSpot && action) stage.act();
 
+  // ワープ: 流れる星を進め、暗転に入る瞬間に星へ降りる（暗転中は移れないが、星図は暗転中に開けないので起きないはず）
+  if (warp.update(dt) && !switchTo(planetStage)) console.warn('ワープ先へ移れなかった（暗転中）');
+  streaks.update(dt, warp.intensity);
+
   // 会話: 場所に入ったとき・ジャンプしたとき・しばらく放っておかれたとき。
   // 入ってからあいさつまでの間は、ジャンプなどのセリフで割り込ませない（あいさつが消えないように）
-  const now = time / 1000;
-  if (elapsed >= greetAt) {
+  if (now >= greetAt) {
     greetAt = Infinity;
     say(talk.greet(now), now);
   } else if (greetAt !== Infinity) {
     // あいさつ待ち
   } else if (wasGrounded && !walker.grounded && input.jump) {
     say(talk.jumped(now), now);
-  } else {
+  } else if (!paused) {
+    // 星図を見ている間とワープ中は「放っておかれている」わけではないので、放置の時間を進めない
     say(talk.update(dt, amount > 0, now), now);
   }
 

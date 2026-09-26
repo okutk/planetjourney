@@ -104,9 +104,10 @@ body {
   background: rgba(159, 232, 255, 0.6);
 }
 
-/* 場所を切り替えるときの暗転 */
+/* 場所を切り替えるときの暗転。いちばん上に描く */
 .fade {
   position: fixed;
+  z-index: 3;
   inset: 0;
   background: #000;
   opacity: 0;
@@ -140,9 +141,10 @@ body {
   pointer-events: none;
 }
 
-/* ミラの吹き出し */
+/* ミラの吹き出し。星図より上、暗転より下に描く */
 .speech-bubble {
   position: fixed;
+  z-index: 2;
   top: 0;
   left: 0;
   max-width: min(60vw, 320px);
@@ -178,4 +180,88 @@ body {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* 星図（船の部屋で開く、行き先を選ぶ画面）。操作の層より上、吹き出しより下に描く */
+.star-map {
+  position: fixed;
+  z-index: 1;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: max(16px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  box-sizing: border-box;
+  background: rgba(11, 16, 38, 0.92);
+  color: #e8ecff;
+  font-family: system-ui, sans-serif;
+}
+
+.star-map[hidden] {
+  display: none;
+}
+
+.star-map h2 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: 0.12em;
+}
+
+.star-list {
+  display: flex;
+  flex: 1;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  align-items: stretch;
+}
+
+.star-card {
+  flex: 1 0 200px;
+  max-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 2px solid rgba(159, 232, 255, 0.5);
+  background: rgba(159, 232, 255, 0.12);
+  color: #e8ecff;
+  font: 14px/1.5 system-ui, sans-serif;
+  text-align: left;
+  touch-action: pan-x;
+}
+
+.star-card:active {
+  background: rgba(159, 232, 255, 0.3);
+}
+
+.star-card:disabled {
+  border-color: rgba(232, 236, 255, 0.2);
+  background: rgba(232, 236, 255, 0.05);
+  color: rgba(232, 236, 255, 0.55);
+}
+
+.star-card strong {
+  font-size: 17px;
+}
+
+.star-status {
+  margin-top: auto;
+  font-style: normal;
+  font-size: 12px;
+  color: #9fe8ff;
+}
+
+.star-close {
+  align-self: flex-end;
+  min-width: 96px;
+  height: 44px;
+  padding: 0 20px;
+  border-radius: 22px;
+  border: 2px solid rgba(232, 236, 255, 0.5);
+  background: rgba(232, 236, 255, 0.1);
+  color: #e8ecff;
+  font: 600 15px system-ui, sans-serif;
 }
