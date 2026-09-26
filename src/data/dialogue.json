@@ -41,6 +41,58 @@
     ]
   },
   {
+    "id": "board.first",
+    "concept": "board",
+    "criteria": [
+      {
+        "fact": "place",
+        "op": "eq",
+        "value": "ship"
+      },
+      {
+        "fact": "planet",
+        "op": "missing"
+      }
+    ],
+    "lines": [
+      "ここが、わたしたちの船。窓の外に見えるのが、最初の星だよ。星図の台に触れたら、出発できる。"
+    ],
+    "once": true
+  },
+  {
+    "id": "board.return",
+    "concept": "board",
+    "criteria": [
+      {
+        "fact": "place",
+        "op": "eq",
+        "value": "ship"
+      },
+      {
+        "fact": "planet",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "おかえり。{planet}、どうだった？ ……わたしは、楽しかった。",
+      "船に戻ってきた。ここ、ちょっと落ち着くね。"
+    ]
+  },
+  {
+    "id": "board.default",
+    "concept": "board",
+    "criteria": [
+      {
+        "fact": "place",
+        "op": "eq",
+        "value": "ship"
+      }
+    ],
+    "lines": [
+      "船の部屋だよ。星図の台で、次の星を選べる。"
+    ]
+  },
+  {
     "id": "jump.first",
     "concept": "jump",
     "criteria": [
@@ -53,6 +105,11 @@
         "fact": "jumps",
         "op": "lt",
         "value": 20
+      },
+      {
+        "fact": "place",
+        "op": "eq",
+        "value": "planet"
       }
     ],
     "lines": [
@@ -86,6 +143,22 @@
       "着地、成功。"
     ],
     "cooldown": 8
+  },
+  {
+    "id": "jump.ship",
+    "concept": "jump",
+    "criteria": [
+      {
+        "fact": "place",
+        "op": "eq",
+        "value": "ship"
+      }
+    ],
+    "lines": [
+      "船の中で跳ねるの？ 天井、気をつけてね。",
+      "ここは人工重力だから、星の上とは跳び心地が違うでしょ。"
+    ],
+    "cooldown": 20
   },
   {
     "id": "lap.first",
@@ -169,7 +242,49 @@
     ],
     "lines": [
       "次はどっちへ行く？",
-      "あっちの丘、気にならない？"
+      "……ん？ どうしたの？"
+    ],
+    "cooldown": 30
+  },
+  {
+    "id": "idle.planet",
+    "concept": "idle",
+    "criteria": [
+      {
+        "fact": "idleSeconds",
+        "op": "gte",
+        "value": 20
+      },
+      {
+        "fact": "place",
+        "op": "eq",
+        "value": "planet"
+      }
+    ],
+    "lines": [
+      "あっちの丘、気にならない？",
+      "ねえ、もう少し歩いてみない？"
+    ],
+    "cooldown": 30
+  },
+  {
+    "id": "idle.ship",
+    "concept": "idle",
+    "criteria": [
+      {
+        "fact": "idleSeconds",
+        "op": "gte",
+        "value": 20
+      },
+      {
+        "fact": "place",
+        "op": "eq",
+        "value": "ship"
+      }
+    ],
+    "lines": [
+      "出発するなら、星図の台に触れてね。",
+      "窓の外、ずっと見ていられるね。……データでは、ただの座標だったのに。"
     ],
     "cooldown": 30
   }

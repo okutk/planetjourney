@@ -106,4 +106,15 @@ describe('OrbitCamera', () => {
     camera.zoom(0.001);
     expect(camera.distance).toBe(minDistance);
   });
+
+  it('reset は向きだけを合わせ直し、距離と見下ろす角度は引き継ぐ', () => {
+    const camera = createCamera();
+    camera.zoom(1.5);
+    camera.rotate(0.3, 0.2, UP);
+    const { distance, pitch } = camera;
+    camera.reset(new Vector3(1, 1, 0), UP);
+    expect(camera.heading.toArray()).toEqual([1, 0, 0]);
+    expect(camera.distance).toBe(distance);
+    expect(camera.pitch).toBe(pitch);
+  });
 });

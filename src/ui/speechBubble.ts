@@ -44,8 +44,7 @@ export class SpeechBubble {
     const elapsed = now - this.startedAt;
     const lastAt = this.revealAt.length > 0 ? this.revealAt[this.revealAt.length - 1] : 0;
     if (elapsed > lastAt + HOLD) {
-      this.visible = false;
-      this.element.classList.remove('visible');
+      this.hide();
       return;
     }
     // 現れた文字の数が変わったときだけ DOM を書きかえる
@@ -57,6 +56,12 @@ export class SpeechBubble {
     }
     this.element.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
     this.element.style.opacity = onScreen ? '1' : '0';
+  }
+
+  /** 途中でも吹き出しを消す（場所を移るとき）。 */
+  hide(): void {
+    this.visible = false;
+    this.element.classList.remove('visible');
   }
 
   dispose(): void {

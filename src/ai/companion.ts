@@ -1,6 +1,6 @@
 import { Vector3 } from 'three';
 import { toTangent } from '../core/sphere';
-import type { SphericalWalker } from '../core/walker';
+import type { Walker } from '../core/walker';
 
 /** ミラがプレイヤーについていくときの設定値。距離は地表に沿った直線距離で近似する。 */
 export interface FollowConfig {
@@ -35,7 +35,7 @@ const tmpRight = new Vector3();
 const tmpAway = new Vector3();
 
 /** プレイヤーの斜め後ろの「定位置」（後ろ behind、右へ side）を out に書き込む。 */
-export function followSlot(player: SphericalWalker, config: FollowConfig, out: Vector3): Vector3 {
+export function followSlot(player: Walker, config: FollowConfig, out: Vector3): Vector3 {
   tmpRight.crossVectors(player.forward, player.up);
   return out
     .copy(player.position)
@@ -49,8 +49,8 @@ export function followSlot(player: SphericalWalker, config: FollowConfig, out: V
  * プレイヤーに近づきすぎたら、離れる向きへ押し返す。
  */
 export function followIntent(
-  mira: SphericalWalker,
-  player: SphericalWalker,
+  mira: Walker,
+  player: Walker,
   config: FollowConfig,
   out: FollowIntent,
 ): FollowIntent {

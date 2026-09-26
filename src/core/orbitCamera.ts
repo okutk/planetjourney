@@ -53,8 +53,14 @@ export class OrbitCamera {
     heading: Vector3,
     up: Vector3,
   ) {
-    toTangent(this.heading.copy(heading), up);
+    this.reset(heading, up);
     this.distance = config.distance;
+  }
+
+  /** 向きだけを heading に合わせ直す（場所を移ったとき）。距離と見下ろす角度はそのまま。 */
+  reset(heading: Vector3, up: Vector3): void {
+    toTangent(this.heading.copy(heading), up);
+    this.sinceManual = Infinity;
   }
 
   /** 距離を factor 倍にする（1 より大きいと遠ざかる）。minDistance〜maxDistance に収める。 */

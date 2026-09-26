@@ -23,6 +23,29 @@ export interface WalkInput {
   jump: boolean;
 }
 
+/**
+ * 歩き手の共通の形。球面（SphericalWalker）でも船の部屋の床（RoomWalker）でも、
+ * 操作・追従・カメラから同じように扱えるようにする。
+ */
+export interface Walker {
+  /** ワールド座標での位置 */
+  readonly position: Vector3;
+  /** 足元から頭へ向かう単位ベクトル */
+  readonly up: Vector3;
+  /** 向いている方向（地面に接する単位ベクトル） */
+  readonly forward: Vector3;
+  /** 地面に立っているか */
+  readonly grounded: boolean;
+  /** 直前の step で地面に沿って動いた分の回転。カメラの向きを一緒に運ぶのに使う */
+  readonly lastRotation: Quaternion;
+  /** direction の方へ、最大 maxAngle だけ向きを回す。 */
+  faceTowards(direction: Vector3, maxAngle: number): void;
+  /** dt 秒だけ進める。 */
+  step(input: WalkInput, dt: number): void;
+  /** ローカルの +Y が up、+Z が forward を向く回転を返す。見た目の向きに使う。 */
+  orientation(out?: Quaternion): Quaternion;
+}
+
 export const DEFAULT_WALKER_CONFIG: Readonly<
   Omit<WalkerConfig, 'center' | 'planetRadius' | 'surfaceRadius'>
 > = {
@@ -43,7 +66,7 @@ const tmpBasis = new Matrix4();
  * 球面重力の上を歩き、ジャンプするキャラクターの物理。描画には依存しない。
  * 水平移動は中心まわりの回転として扱うので、どれだけ歩いても高さがずれない。
  */
-export class SphericalWalker {
+export class SphericalWalker implements Walker {
   /** ワールド座標での位置 */
   readonly position = new Vector3();
   /** 足元から頭へ向かう単位ベクトル（中心から見た外向き） */
