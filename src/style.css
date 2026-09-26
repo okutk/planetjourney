@@ -83,9 +83,20 @@ body {
   background: rgba(244, 199, 216, 0.6);
 }
 
-/* マウスで遊ぶとき（タッチ画面でないとき）は、ジャンプボタンを隠す（Space でジャンプ） */
-@media (hover: hover) and (pointer: fine) {
+/* マウスで遊ぶとき（タッチできる入力が 1 つもないとき）は、ジャンプボタンを隠す（Space でジャンプ） */
+@media (hover: hover) and (pointer: fine) and (not (any-pointer: coarse)) {
   .jump-button {
     display: none;
   }
+}
+
+/* 性能の表示（?debug のときだけ） */
+.perf-overlay {
+  position: fixed;
+  top: max(36px, calc(env(safe-area-inset-top) + 24px));
+  left: max(16px, env(safe-area-inset-left));
+  color: #e8ecff;
+  font: 12px ui-monospace, monospace;
+  opacity: 0.8;
+  pointer-events: none;
 }

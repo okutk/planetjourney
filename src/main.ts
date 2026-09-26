@@ -21,6 +21,7 @@ import { MiraPlaceholder } from './character/miraPlaceholder';
 import { DEFAULT_ORBIT_CAMERA_CONFIG, OrbitCamera } from './core/orbitCamera';
 import { Terrain } from './core/terrain';
 import { DEFAULT_WALKER_CONFIG, SphericalWalker, type WalkInput } from './core/walker';
+import { PerfOverlay } from './ui/perfOverlay';
 import { TouchControls } from './ui/touchControls';
 import { PlanetView } from './world/planet';
 
@@ -166,10 +167,17 @@ function updateCamera(dt: number): void {
 camera.position.copy(orbit.eye(walker.position, walker.up, cameraGoal));
 camera.up.copy(walker.up);
 
+// URL に ?debug を付けると、性能（fps・ドローコール数など）を表示する
+const perf = new URLSearchParams(window.location.search).has('debug')
+  ? new PerfOverlay(document.body, renderer)
+  : null;
+
 const input: WalkInput = { forward: 0, right: 0, jump: false };
 let lastTime: number | undefined;
 renderer.setAnimationLoop((time) => {
-  const dt = lastTime === undefined ? 0 : Math.min((time - lastTime) / 1000, MAX_DT);
+  // 性能表示には上限で切る前の経過時間を渡す（30fps を下回ったことも表示できるように）
+  const rawDt = lastTime === undefined ? 0 : (time - lastTime) / 1000;
+  const dt = Math.min(rawDt, MAX_DT);
   lastTime = time;
 
   orbit.rotate(
@@ -209,4 +217,5 @@ renderer.setAnimationLoop((time) => {
   miraWalker.orientation(mira.group.quaternion);
   updateCamera(dt);
   renderer.render(scene, camera);
+  perf?.update(rawDt);
 });
