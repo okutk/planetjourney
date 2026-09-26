@@ -24,11 +24,11 @@ import { createRandom } from './core/noise';
 import dialogueData from './data/dialogue.json';
 import { SpeechBubble } from './ui/speechBubble';
 import { DEFAULT_FOLLOW_CONFIG, followIntent, followSlot, seekIntent, type FollowIntent } from './ai/companion';
-import { Projector } from './ai/projection';
+import { Projector, TASK_RANGE } from './ai/projection';
 import { MiraView } from './character/mira';
 import { Journey } from './core/journey';
 import { ACTION_RADIUS, parsePlanets, POD_ANGLE, type PlanetInfo } from './core/planets';
-import { ARRIVE_RADIUS, MiraTask, REQUEST_RADIUS } from './core/gimmick';
+import { ARRIVE_RADIUS, MiraTask, REQUEST_RADIUS, SLOW_RADIUS } from './core/gimmick';
 import { DEFAULT_ORBIT_CAMERA_CONFIG, OrbitCamera } from './core/orbitCamera';
 import { RoomWalker } from './core/roomWalker';
 import { behindOn } from './core/sphere';
@@ -246,7 +246,7 @@ function createPlanetStage(info: PlanetInfo): PlanetStage {
         radius: REQUEST_RADIUS,
         available: () => task === null && !journey.isSolved(info.id, def.id),
         act: () => {
-          task = { run: new MiraTask(def), view: gimmickView };
+          task = { run: new MiraTask(def, TASK_RANGE), view: gimmickView };
           talk.interrupt();
           voice.stop();
           say(talk.askTask(now, def.kind, def.name), now);
@@ -267,7 +267,7 @@ function createPlanetStage(info: PlanetInfo): PlanetStage {
       if (!task) return false;
       const { run, view: gimmickView } = task;
       // 作業中のミラは仕掛けへ歩いていき、着いたら仕掛けの方を向いて作業する
-      const distance = seekIntent(mira, gimmickView.position, ARRIVE_RADIUS, 3, miraIntent);
+      const distance = seekIntent(mira, gimmickView.position, ARRIVE_RADIUS, SLOW_RADIUS, miraIntent);
       if (miraIntent.amount === 0) mira.faceTowards(miraIntent.direction, TURN_SPEED * dt);
       const event = run.update(dt, distance <= ARRIVE_RADIUS, walker.position.distanceTo(gimmickView.position));
       gimmickView.setWorking(run.phase === 'work' ? run.progress : null);

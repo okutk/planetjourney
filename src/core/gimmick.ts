@@ -4,8 +4,6 @@
  * 作業のあいだプレイヤーがそばにいないと投影が届かず、作業は途中で止まる（役割分担）。
  */
 
-import { DEFAULT_PROJECTION_CONFIG } from '../ai/projection';
-
 /** 仕掛けの種類。照らす・スキャンする・狭い所に入る */
 export type GimmickKind = 'light' | 'scan' | 'crawl';
 export const GIMMICK_KINDS: readonly GimmickKind[] = ['light', 'scan', 'crawl'];
@@ -24,13 +22,10 @@ export interface GimmickDef {
 export const WORK_SECONDS: Readonly<Record<GimmickKind, number>> = { light: 1.6, scan: 2.4, crawl: 3 };
 /** 仕掛けからこの距離までプレイヤーが近づくと、ミラに頼めるようになる */
 export const REQUEST_RADIUS = 2.4;
-/**
- * 投影が届く距離（プレイヤーと仕掛けの距離）。作業中にプレイヤーが仕掛けからこれより離れると、作業は止まる。
- * ミラ自身の投影範囲（src/ai/projection.ts。プレイヤーとミラの距離）から導き、ミラが映し直される少し手前で止める
- */
-export const PROJECTION_RANGE = DEFAULT_PROJECTION_CONFIG.range - 1;
 /** ミラが仕掛けに着いたとみなす距離 */
 export const ARRIVE_RADIUS = 0.9;
+/** 仕掛けからこの距離より近づくと、ミラは歩く速さを落とし始める（ARRIVE_RADIUS と対にして使う） */
+export const SLOW_RADIUS = 3;
 
 export type TaskPhase = 'approach' | 'work' | 'done' | 'cancelled';
 /** update() が返す出来事。started は作業を始めた瞬間、done は終えた瞬間、cancelled は投影が届かなくなった瞬間 */
@@ -41,10 +36,14 @@ export class MiraTask {
   phase: TaskPhase = 'approach';
   private elapsed = 0;
 
+  /**
+   * range は投影が届く距離（プレイヤーと仕掛けの距離）。作業中にプレイヤーがこれより離れると止まる。
+   * ミラの投影範囲（src/ai/projection.ts の TASK_RANGE）から渡す
+   */
   constructor(
     readonly gimmick: GimmickDef,
+    readonly range: number,
     readonly workSeconds = WORK_SECONDS[gimmick.kind],
-    readonly range = PROJECTION_RANGE,
   ) {}
 
   /** 作業の進み具合（0〜1）。作業前は 0、終えたら 1 */

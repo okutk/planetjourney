@@ -1,19 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_PROJECTION_CONFIG } from '../ai/projection';
-import { MiraTask, PROJECTION_RANGE, type GimmickDef } from './gimmick';
+import { MiraTask, type GimmickDef } from './gimmick';
 
 const LANTERN: GimmickDef = { id: 'lantern', kind: 'light', name: '灯り', direction: [0, 1, 0] };
 
-describe('PROJECTION_RANGE', () => {
-  it('ミラの投影範囲より少し短く、映し直される前に作業が止まる', () => {
-    expect(PROJECTION_RANGE).toBeGreaterThan(0);
-    expect(PROJECTION_RANGE).toBeLessThan(DEFAULT_PROJECTION_CONFIG.range);
-  });
-});
-
 describe('MiraTask', () => {
   it('着くまでは進まず、着いたら作業を始め、時間がたてば終わる', () => {
-    const task = new MiraTask(LANTERN, 1, 5);
+    const task = new MiraTask(LANTERN, 5, 1);
     expect(task.phase).toBe('approach');
     expect(task.update(0.5, false, 1)).toBeNull();
     expect(task.progress).toBe(0);
@@ -28,7 +20,7 @@ describe('MiraTask', () => {
   });
 
   it('プレイヤーが投影の届く距離より離れると、作業は止まり、戻っても続かない', () => {
-    const task = new MiraTask(LANTERN, 1, 5);
+    const task = new MiraTask(LANTERN, 5, 1);
     task.update(0.1, true, 1);
     expect(task.update(0.3, true, 6)).toBe('cancelled');
     expect(task.phase).toBe('cancelled');
@@ -38,7 +30,7 @@ describe('MiraTask', () => {
   });
 
   it('向かう途中で離れても止まる', () => {
-    const task = new MiraTask(LANTERN, 1, 5);
+    const task = new MiraTask(LANTERN, 5, 1);
     expect(task.update(0.1, false, 5.5)).toBe('cancelled');
   });
 });
