@@ -1,6 +1,8 @@
-import { Box3, Group, type Object3D } from 'three';
+import { Box3, Group, type Object3D, Vector3 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { VRM, VRMLoaderPlugin, VRMMetaLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+import { VRM, VRMLoaderPlugin, VRMMetaLoaderPlugin, VRMUtils, type VRMExpressionManager } from '@pixiv/three-vrm';
+import { Blinker, ExpressionFader } from '../ai/face';
+import { Gaze } from '../ai/gaze';
 import { HologramLook } from './hologram';
 import { buildProceduralClips, MiraMotion, type MotionClips } from './miraMotion';
 import { MiraPlaceholder } from './miraPlaceholder';
@@ -11,8 +13,13 @@ const MODEL_URL = `${import.meta.env.BASE_URL}models/mira.vrm`;
 const HEAD_MARGIN = 0.15;
 /** 仮表示（カプセル）のときの、頭の上の高さ */
 const PLACEHOLDER_HEIGHT = 1.1;
+/** 目の高さは、頭の上からこれだけ下（視線の起点） */
+const EYE_BELOW_TOP = 0.28;
 
 const tmpBox = new Box3();
+const tmpEye = new Vector3();
+const tmpFront = new Vector3();
+const tmpUp = new Vector3();
 
 /**
  * ミラの見た目。足元が原点、+Z が正面（VRM 1.0 の向きと同じ）。
@@ -29,6 +36,13 @@ export class MiraView {
   private placeholder: MiraPlaceholder | null;
   private motion: MiraMotion | null = null;
   private hologram: HologramLook | null = null;
+  private readonly blinker = new Blinker();
+  private readonly expression = new ExpressionFader();
+  private readonly gaze = new Gaze();
+  /** 見る物の位置（ワールド座標）。null なら正面を見る。毎フレーム外から入れる */
+  gazeTarget: Vector3 | null = null;
+  /** 前のフレームに VRM へ重みを書いた表情の名前（次のフレームで 0 に戻すために覚えておく） */
+  private readonly appliedExpressions: string[] = [];
   /** 差し替え用のモーション。null なら手続きのモーションを使う */
   private clips: MotionClips | null = null;
   private disposed = false;
@@ -106,6 +120,11 @@ export class MiraView {
     }
   }
 
+  /** 表情を出す（VRM の preset 名。happy / sad / surprised / relaxed / angry など）。hold 秒で戻る */
+  express(name: string | undefined, hold?: number): void {
+    this.expression.show(name ?? null, hold);
+  }
+
   /**
    * 毎フレーム呼ぶ。位置と向きを group に入れたあと、描画の前に呼ぶこと。
    * walkAmount は歩く量（0〜1）、noise は投影範囲の端のノイズ（0〜1）、visibility は見え方（0 で消えている）
@@ -113,7 +132,40 @@ export class MiraView {
   update(dt: number, walkAmount: number, noise = 0, visibility = 1): void {
     this.motion?.update(dt, walkAmount);
     this.hologram?.update(noise, visibility);
+    this.updateFace(dt);
     this.vrm?.update(dt);
+  }
+
+  /** まばたき・表情・視線。重みの計算は src/ai で行い、ここでは VRM に反映するだけ */
+  private updateFace(dt: number): void {
+    // 重みの時間は VRM の読み込み前から進める（仮表示のあいだに出た表情が、読み込み後に遅れて出ないように）
+    this.expression.update(dt);
+    const blink = this.blinker.update(dt);
+    const { vrm } = this;
+    if (!vrm) return;
+    const manager = vrm.expressionManager;
+    if (manager) {
+      // 表情が出ているあいだは、まばたきで目の形が崩れないように弱める
+      manager.setValue('blink', blink * (1 - this.expression.strength));
+      // 消えた表情の重みが残らないよう、前のフレームに書いた表情はいったん 0 にする
+      for (const name of this.appliedExpressions) manager.setValue(name, 0);
+      this.appliedExpressions.length = 0;
+      this.applyExpression(manager, this.expression.previous, this.expression.previousWeight);
+      this.applyExpression(manager, this.expression.current, this.expression.currentWeight);
+    }
+    if (vrm.lookAt) {
+      // 目の位置と顔の正面は group（足元が原点、+Z が正面）から求める
+      tmpFront.set(0, 0, 1).applyQuaternion(this.group.quaternion);
+      tmpUp.set(0, 1, 0).applyQuaternion(this.group.quaternion);
+      this.group.getWorldPosition(tmpEye).addScaledVector(tmpUp, this.height - HEAD_MARGIN - EYE_BELOW_TOP);
+      vrm.lookAt.lookAt(this.gaze.update(tmpEye, tmpFront, this.gazeTarget, dt));
+    }
+  }
+
+  private applyExpression(manager: VRMExpressionManager, name: string | null, weight: number): void {
+    if (name === null || weight <= 0 || !manager.getExpression(name)) return;
+    manager.setValue(name, weight);
+    this.appliedExpressions.push(name);
   }
 
   /**
@@ -124,6 +176,7 @@ export class MiraView {
     if (!this.vrm) return;
     this.group.updateWorldMatrix(true, true);
     this.vrm.springBoneManager?.reset();
+    this.gaze.reset();
   }
 
   dispose(): void {

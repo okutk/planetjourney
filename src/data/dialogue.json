@@ -17,7 +17,8 @@
     "lines": [
       "ここが、わたしの初めての地面……。データでは知ってた。でも、こんなにふかふかなんだね。"
     ],
-    "once": true
+    "once": true,
+    "expression": "surprised"
   },
   {
     "id": "greet.crystal.first",
@@ -71,7 +72,8 @@
     "lines": [
       "着いたよ。ここは{planet}。さあ、歩いてみよう！",
       "{planet}に到着。今日は何が見つかるかな。"
-    ]
+    ],
+    "expression": "happy"
   },
   {
     "id": "greet.default",
@@ -98,7 +100,8 @@
     "lines": [
       "ここが、わたしたちの船。窓の外に見えるのが、最初の星だよ。星図の台に触れたら、出発できる。"
     ],
-    "once": true
+    "once": true,
+    "expression": "happy"
   },
   {
     "id": "board.return",
@@ -117,7 +120,8 @@
     "lines": [
       "おかえり。{planet}、どうだった？ ……わたしは、楽しかった。",
       "船に戻ってきた。ここ、ちょっと落ち着くね。"
-    ]
+    ],
+    "expression": "happy"
   },
   {
     "id": "board.default",
@@ -151,7 +155,8 @@
     "lines": [
       "これが星図。どの星のデータも、全部ここにある。……行ったことは、まだないけど。"
     ],
-    "once": true
+    "once": true,
+    "expression": "relaxed"
   },
   {
     "id": "starmap.default",
@@ -186,7 +191,8 @@
     "lines": [
       "{destination}へ、ワープ開始。……しっかりつかまって。つかまる所、ないけど。"
     ],
-    "once": true
+    "once": true,
+    "expression": "surprised"
   },
   {
     "id": "warp.default",
@@ -225,7 +231,8 @@
     "lines": [
       "わっ、跳んだ！ この星の重力なら、もっと高く跳べるはず……計算上は。"
     ],
-    "once": true
+    "once": true,
+    "expression": "surprised"
   },
   {
     "id": "jump.many",
@@ -241,7 +248,8 @@
       "そんなに跳ぶの、楽しい？ ……わたしもやってみたいな。",
       "ぴょんぴょん。記録しておくね、跳んだ回数。"
     ],
-    "cooldown": 60
+    "cooldown": 60,
+    "expression": "happy"
   },
   {
     "id": "jump.default",
@@ -268,7 +276,8 @@
       "船の中で跳ねるの？ 天井、気をつけてね。",
       "ここは人工重力だから、星の上とは跳び心地が違うでしょ。"
     ],
-    "cooldown": 20
+    "cooldown": 20,
+    "expression": "angry"
   },
   {
     "id": "lap.first",
@@ -283,7 +292,8 @@
     "lines": [
       "一周して、元の場所に戻ってきた……！ 星が丸いって、こういうことなんだね。"
     ],
-    "once": true
+    "once": true,
+    "expression": "surprised"
   },
   {
     "id": "lap.default",
@@ -318,7 +328,8 @@
     "lines": [
       "……あの、まだそこにいる？"
     ],
-    "cooldown": 60
+    "cooldown": 60,
+    "expression": "sad"
   },
   {
     "id": "idle.close",
@@ -338,7 +349,8 @@
     "lines": [
       "のんびりするのも、いいね。風の音、データより静かだ。"
     ],
-    "cooldown": 60
+    "cooldown": 60,
+    "expression": "relaxed"
   },
   {
     "id": "idle.default",
@@ -375,7 +387,8 @@
       "あっちの丘、気にならない？",
       "ねえ、もう少し歩いてみない？"
     ],
-    "cooldown": 30
+    "cooldown": 30,
+    "expression": "happy"
   },
   {
     "id": "idle.ship",
