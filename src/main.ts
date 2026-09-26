@@ -158,7 +158,9 @@ const perf = new URLSearchParams(window.location.search).has('debug')
 const input: WalkInput = { forward: 0, right: 0, jump: false };
 let lastTime: number | undefined;
 renderer.setAnimationLoop((time) => {
-  const dt = lastTime === undefined ? 0 : Math.min((time - lastTime) / 1000, MAX_DT);
+  // 性能表示には上限で切る前の経過時間を渡す（30fps を下回ったことも表示できるように）
+  const rawDt = lastTime === undefined ? 0 : (time - lastTime) / 1000;
+  const dt = Math.min(rawDt, MAX_DT);
   lastTime = time;
 
   orbit.rotate(
@@ -191,5 +193,5 @@ renderer.setAnimationLoop((time) => {
   walker.orientation(player.quaternion);
   updateCamera(dt);
   renderer.render(scene, camera);
-  perf?.update(dt);
+  perf?.update(rawDt);
 });
