@@ -299,7 +299,9 @@ const bubbleAnchor = new Vector3();
 const fader = new Fader(document.body);
 let stage: Stage;
 let greetAt = Infinity; // この時刻になったら、入った場所のあいさつをする
-let now = 0; // ループの時刻（秒）。会話と吹き出しはすべてこの時計で動く（時計を混ぜると吹き出しが消える）
+// ループの時刻（秒）。会話と吹き出しはすべてこの時計で動く（時計を混ぜると吹き出しが消える）。
+// 起点は requestAnimationFrame の時刻と同じにする（読み込みに時間がかかっても、最初のあいさつまでの間が保たれる）
+let now = performance.now() / 1000;
 function enterStage(next: Stage): void {
   stage = next;
   stage.enter();

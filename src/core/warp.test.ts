@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { WarpSequence } from './warp';
+import { advanceStreak, WarpSequence } from './warp';
 
 const DT = 0.05;
+
+describe('advanceStreak', () => {
+  it('手前へ進み、いちばん手前を過ぎたら奥へ戻る（カメラの後ろへは行かない）', () => {
+    expect(advanceStreak(-10, 1, -2, -24)).toBe(-9);
+    expect(advanceStreak(-2.5, 1, -2, -24)).toBeCloseTo(-23.5);
+    let z = -23;
+    for (let i = 0; i < 10000; i++) {
+      z = advanceStreak(z, 40 / 60, -2, -24);
+      expect(z).toBeLessThanOrEqual(-2);
+      expect(z).toBeGreaterThan(-24);
+    }
+  });
+});
 
 describe('WarpSequence', () => {
   it('charge → jump → settle の順に進み、暗転に入る瞬間に一度だけ合図する', () => {

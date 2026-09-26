@@ -1,5 +1,6 @@
 import { BufferAttribute, BufferGeometry, LineBasicMaterial, LineSegments } from 'three';
 import { createRandom } from '../core/noise';
+import { advanceStreak } from '../core/warp';
 
 const COUNT = 160; // 流れる星の本数
 const NEAR = -2; // カメラからいちばん近い z（カメラ座標。前が -Z）
@@ -44,8 +45,7 @@ export class WarpStreaks {
     this.material.opacity = intensity;
     const { points, positions } = this;
     for (let i = 0; i < COUNT; i++) {
-      let z = points[i * 3 + 2] + SPEED * intensity * dt;
-      if (z > NEAR) z -= FAR - NEAR; // 手前を過ぎたら奥へ戻す
+      const z = advanceStreak(points[i * 3 + 2], SPEED * intensity * dt, NEAR, FAR);
       points[i * 3 + 2] = z;
       const x = points[i * 3];
       const y = points[i * 3 + 1];

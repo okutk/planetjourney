@@ -13,6 +13,15 @@ export const DEFAULT_WARP_CONFIG: Readonly<WarpConfig> = { charge: 1.4, jump: 0.
 export type WarpPhase = 'idle' | 'charge' | 'jump' | 'settle';
 
 /**
+ * 流れる星 1 本の奥行き z を distance だけ手前（near の向き）へ進め、near を過ぎたら far の側へ折り返す。
+ * near と far はカメラ座標の z（前が負なので far < near < 0）。distance は 1 回で区間の長さを超えない前提。
+ */
+export function advanceStreak(z: number, distance: number, near: number, far: number): number {
+  const next = z + distance;
+  return next > near ? next - (near - far) : next;
+}
+
+/**
  * ワープ演出の進行。描画には依存せず、時間だけを数える。
  * charge（星が流れ始める）→ jump（暗転。ここで場所を入れ替える）→ settle（星が消える）→ idle。
  */
