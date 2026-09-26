@@ -391,6 +391,21 @@ describe('TalkDirector', () => {
       director.enterPlanet('ocean', '海だけの星', 1);
       expect(director.announceDiscovery(30)?.ruleId).toBe('codex.rare');
     });
+
+    it('星を出るときの日記の材料に、その訪問での出来事と星の名前が入る', () => {
+      const { director } = withMemory();
+      director.enterPlanet('origin', 'はじまりの星', 1);
+      director.jumped(0);
+      director.leftBehind();
+      director.inspected('刻まれた石');
+      const facts = director.diaryFacts(Date.UTC(2026, 8, 1, 12, 10));
+      expect(facts).toMatchObject({ planet: 'はじまりの星', firstVisit: true, jumps: 1, leftBehind: 1, inspected: 1 });
+      expect(facts.lastInspect).toBe('刻まれた石');
+      // 次に降りたら数え直す
+      director.enterShip();
+      director.enterPlanet('origin', 'はじまりの星', 2);
+      expect(director.diaryFacts(0)).toMatchObject({ firstVisit: false, jumps: 0, leftBehind: 0 });
+    });
   });
 });
 

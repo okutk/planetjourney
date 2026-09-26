@@ -352,3 +352,15 @@ body {
   font-style: normal;
   color: #ffe9a8;
 }
+
+/* 日記。船の部屋にいるあいだ、図鑑のボタンの下に出す */
+.diary-button {
+  top: calc(max(12px, env(safe-area-inset-top)) + 74px);
+}
+
+.diary-page p {
+  margin: 0;
+  white-space: pre-line;
+  font-size: 14px;
+  line-height: 1.8;
+}
