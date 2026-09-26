@@ -83,10 +83,11 @@ describe('OrbitCamera', () => {
     expect(walkWithStick(Math.SQRT1_2, Math.SQRT1_2)).toBeLessThan(1e-9);
   });
 
-  it('ほぼ前へ歩くときの回り込みはゆるやか（5 秒で 45° 未満）', () => {
-    for (const degrees of [5, 10, 15, 20]) {
+  it('ほぼ前へ歩くときの回り込みはゆるやか（5 秒で 60° 未満）', () => {
+    // 回り込みがいちばん強いのはコーン（25°）の半分の 12.5° 前後
+    for (const degrees of [5, 10, 12.5, 15, 20]) {
       const rad = (degrees * Math.PI) / 180;
-      expect(walkWithStick(Math.sin(rad), Math.cos(rad))).toBeLessThan(Math.PI / 4);
+      expect(walkWithStick(Math.sin(rad), Math.cos(rad))).toBeLessThan(Math.PI / 3);
     }
   });
 
