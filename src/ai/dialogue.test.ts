@@ -94,6 +94,16 @@ describe('DialogueSelector', () => {
     }
   });
 
+  it('ルールの expression をセリフに載せ、なければ付けない', () => {
+    const selector = new DialogueSelector(
+      [rule({ id: 'plain' }), rule({ id: 'smile', criteria: [{ fact: 'happy', op: 'exists' }], expression: 'happy' })],
+      () => 0,
+    );
+    expect(selector.select('greet', {}, 0)).toMatchObject({ ruleId: 'plain' });
+    expect(selector.select('greet', {}, 0)).not.toHaveProperty('expression');
+    expect(selector.select('greet', { happy: true }, 0)).toMatchObject({ ruleId: 'smile', expression: 'happy' });
+  });
+
   it('セリフの {名前} を事実の値で埋める', () => {
     const selector = new DialogueSelector([rule({ id: 'a', lines: ['{planet}に着いた'] })], createRandom(1));
     expect(selector.select('greet', { planet: '水晶の星' }, 0)?.text).toBe('水晶の星に着いた');
@@ -122,6 +132,12 @@ describe('parseRules', () => {
       'cooldwon',
     );
     expect(() => parseRules([{ id: 'g', concept: 'x', criteria: [], lines: ['1'], once: 'true' }])).toThrow('once');
+    expect(() => parseRules([{ id: 'h', concept: 'x', criteria: [], lines: ['1'], expression: 1 }])).toThrow(
+      'expression',
+    );
+    expect(() => parseRules([{ id: 'i', concept: 'x', criteria: [], lines: ['1'], expression: '' }])).toThrow(
+      'expression',
+    );
     expect(() =>
       parseRules([{ id: 'c', concept: 'x', criteria: [{ fact: 'n', op: 'like', value: 1 }], lines: ['1'] }]),
     ).toThrow('op');
@@ -139,6 +155,13 @@ describe('src/data/dialogue.json', () => {
     for (let seed = 0; seed < 50; seed++) {
       const selector = new DialogueSelector(rules, createRandom(seed));
       expect(selector.select('greet', { visits: 1, planet: 'はじまりの星' }, 0)?.ruleId).toBe('greet.first');
+    }
+  });
+
+  it('expression は VRM の preset にある表情の名前だけを使う（打ち間違いは実行時に黙って無視されるため）', () => {
+    const presets = new Set(['happy', 'angry', 'sad', 'relaxed', 'surprised', 'neutral']);
+    for (const r of rules) {
+      if (r.expression !== undefined) expect(presets.has(r.expression), `${r.id} の ${r.expression}`).toBe(true);
     }
   });
 

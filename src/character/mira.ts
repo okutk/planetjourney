@@ -138,10 +138,11 @@ export class MiraView {
 
   /** まばたき・表情・視線。重みの計算は src/ai で行い、ここでは VRM に反映するだけ */
   private updateFace(dt: number): void {
-    const { vrm } = this;
-    if (!vrm) return;
+    // 重みの時間は VRM の読み込み前から進める（仮表示のあいだに出た表情が、読み込み後に遅れて出ないように）
     this.expression.update(dt);
     const blink = this.blinker.update(dt);
+    const { vrm } = this;
+    if (!vrm) return;
     const manager = vrm.expressionManager;
     if (manager) {
       // 表情が出ているあいだは、まばたきで目の形が崩れないように弱める

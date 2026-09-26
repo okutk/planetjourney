@@ -94,8 +94,8 @@ export class ExpressionFader {
   show(name: string | null, hold = this.config.maxHold): void {
     this.holdLeft = Math.min(hold, this.config.maxHold);
     if (name === null || name === this.current) return;
-    // 前の表情は、いまの重みから消えていく（消えかけの表情がもう 1 つあれば、そちらは捨てる）
-    if (this.current !== null && this.currentWeight > this.previousWeight) {
+    // 前の表情は、いまの重みから消えていく（消えかけの表情がもう 1 つあれば、もともと消えていく途中のそちらを捨てる）
+    if (this.current !== null) {
       this.previous = this.current;
       this.previousWeight = this.currentWeight;
     }
