@@ -1,5 +1,6 @@
-/** 暗転にかける時間（ミリ秒）。CSS の transition と合わせる */
-const FADE_MS = 450;
+/** 暗転にかける時間（秒）。CSS の transition と合わせる */
+export const FADE_SECONDS = 0.45;
+const FADE_MS = FADE_SECONDS * 1000;
 
 /**
  * 場所を切り替えるときの暗転。画面を暗くし、真っ暗になったところで swap を呼び、また明るくする。
