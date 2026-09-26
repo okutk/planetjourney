@@ -3,12 +3,10 @@ import {
   BufferGeometry,
   CapsuleGeometry,
   Color,
-  ConeGeometry,
   DirectionalLight,
   Float32BufferAttribute,
   Group,
   HemisphereLight,
-  IcosahedronGeometry,
   Mesh,
   MeshStandardMaterial,
   PerspectiveCamera,
@@ -19,11 +17,12 @@ import {
   WebGLRenderer,
 } from 'three';
 import { DEFAULT_ORBIT_CAMERA_CONFIG, OrbitCamera } from './core/orbitCamera';
-import { alignToUp, upAt } from './core/sphere';
+import { Terrain } from './core/terrain';
 import { DEFAULT_WALKER_CONFIG, SphericalWalker, type WalkInput } from './core/walker';
 import { TouchControls } from './ui/touchControls';
+import { PlanetView } from './world/planet';
 
-// M1: 球面重力で星の上を歩き、ジャンプできるシーン。
+// M1: 「はじまりの星」の上を、球面重力で歩いてジャンプできるシーン。
 // 操作（移動はカメラから見た向き。プレイヤーは進む方向へ向き直る）
 //   タッチ: 左半分に仮想スティック、右半分のドラッグでカメラを回す（上下で見下ろす角度）、右下のボタンでジャンプ
 //   キーボード（補助）: WASD で移動、Space でジャンプ
@@ -49,25 +48,20 @@ const sun = new DirectionalLight('#fff2d6', 2.2);
 sun.position.set(8, 10, 6);
 scene.add(sun);
 
+// 「はじまりの星」。地形は歩く処理と見た目で同じものを使う
 const planetCenter = new Vector3();
-scene.add(
-  new Mesh(
-    new IcosahedronGeometry(PLANET_RADIUS, 3),
-    new MeshStandardMaterial({ color: '#7fcf8a', flatShading: true }),
-  ),
-);
-
-// 地表の木。歩いたときに進んでいることが分かる目印を兼ねる
-const treeGeometry = new ConeGeometry(0.35, 1.2, 6);
-treeGeometry.translate(0, 0.6, 0);
-const treeMaterial = new MeshStandardMaterial({ color: '#2f7a4b', flatShading: true });
-for (let i = 0; i < 24; i++) {
-  const direction = new Vector3().randomDirection();
-  const tree = new Mesh(treeGeometry, treeMaterial);
-  tree.position.copy(direction).multiplyScalar(PLANET_RADIUS * 0.97);
-  tree.quaternion.copy(alignToUp(upAt(tree.position, planetCenter)));
-  scene.add(tree);
-}
+const SPAWN_DIRECTION = new Vector3(0, 1, 0);
+const terrain = new Terrain({ radius: PLANET_RADIUS, amplitude: 0.5, frequency: 1.3, octaves: 3, seed: 1 });
+const planet = new PlanetView(terrain, {
+  detail: 16,
+  groundColor: '#7fcf8a',
+  treeCount: 28,
+  rockCount: 18,
+  seed: 2,
+  spawn: SPAWN_DIRECTION,
+  spawnClearance: 0.25,
+});
+scene.add(planet.group);
 
 // プレイヤー（仮の見た目）。足元が原点、+Z が正面。向きが分かるよう正面に目印を付ける
 const player = new Group();
@@ -83,6 +77,7 @@ const walker = new SphericalWalker({
   ...DEFAULT_WALKER_CONFIG,
   center: planetCenter,
   planetRadius: PLANET_RADIUS,
+  surfaceRadius: (up) => terrain.radiusAt(up),
 });
 
 scene.add(createStarField(800, 120));
