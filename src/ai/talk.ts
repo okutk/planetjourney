@@ -100,6 +100,17 @@ export class TalkDirector {
     return this.say('taskCancelled', now);
   }
 
+  /**
+   * ミラが自分で行動を変えたとき（自律行動）。behavior が concept になる（follow は話さない）。
+   * spot は見に行く物の名前（セリフの {spot} に入る）。
+   */
+  behave(now: number, behavior: string, spot?: string): DialogueLine | null {
+    this.facts.behavior = behavior;
+    if (spot === undefined) delete this.facts.spot;
+    else this.facts.spot = spot;
+    return behavior === 'follow' ? null : this.say(behavior, now);
+  }
+
   /** 船の部屋に入ったとき（旅の始まりと、星から戻ったとき）。planet には最後に降りた星が残る。 */
   enterShip(): void {
     // 星から戻ってきたら、ほっとする（旅の始まりは除く）

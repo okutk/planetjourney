@@ -271,5 +271,16 @@ describe('TalkDirector', () => {
       expect(director.isSpeaking(2)).toBe(true);
     });
   });
+
+  it('自律行動を変えたときは、その行動のセリフを話す（ついていくときは話さない）', () => {
+    const director = createDirector();
+    expect(director.behave(100, 'follow')).toBeNull();
+    const inspect = director.behave(110, 'inspect', '光る石');
+    expect(inspect?.ruleId.startsWith('inspect.')).toBe(true);
+    expect(inspect?.text).toContain('光る石');
+    expect(director.behave(120, 'sit')?.ruleId.startsWith('sit.')).toBe(true);
+    expect(director.facts.spot).toBeUndefined();
+    expect(director.behave(130, 'hide')?.ruleId).toBe('hide.default');
+  });
 });
 
