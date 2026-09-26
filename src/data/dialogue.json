@@ -376,7 +376,7 @@
     "concept": "fragment",
     "criteria": [
       {
-        "fact": "fragments",
+        "fact": "collected",
         "op": "eq",
         "value": 1
       },
@@ -397,12 +397,12 @@
     "concept": "fragment",
     "criteria": [
       {
-        "fact": "fragments",
+        "fact": "collected",
         "op": "exists"
       }
     ],
     "lines": [
-      "かけら、{fragments}個目。船に戻ったら、投影機に入れよう。",
+      "かけら、{collected}個目。船に戻ったら、投影機に入れよう。",
       "拾った。……きらきらしてる。データにない色。"
     ],
     "expression": "happy"
@@ -458,14 +458,9 @@
   {
     "id": "upgrade.default",
     "concept": "upgrade",
-    "criteria": [
-      {
-        "fact": "stage",
-        "op": "exists"
-      }
-    ],
+    "criteria": [],
     "lines": [
-      "投影機、強化完了。段階{stage}。"
+      "投影機、強化完了。……なんだか、体が少し確かになった。"
     ]
   },
   {

@@ -54,6 +54,8 @@ export class GimmickView {
   /** かけらの位置（ワールド座標）。拾える距離の判定に使う */
   readonly fragmentPosition = new Vector3();
   private spin = 0;
+  /** 拾える状態か。かけらが出た瞬間にそばにいても拾わず、一度離れてから近づいたときに拾う */
+  private armed = false;
 
   constructor(terrain: Terrain, def: GimmickDef) {
     const direction = new Vector3(...def.direction).normalize();
@@ -121,9 +123,26 @@ export class GimmickView {
     this.fragmentPosition.copy(FRAGMENT_OFFSET).applyQuaternion(this.group.quaternion).add(this.position);
   }
 
-  /** かけらを出す（解けたあと、まだ拾っていないとき）か、しまう（拾ったとき）。 */
+  /**
+   * かけらを出す（解けたあと、まだ拾っていないとき）か、しまう（拾ったとき）。
+   * 出した直後は拾えない（作業完了のセリフを、その場で拾って打ち切らないように）
+   */
   setFragment(visible: boolean): void {
     this.fragment.visible = visible;
+    this.armed = false;
+  }
+
+  /**
+   * かけらまでの距離 distance から、いま拾うかを返す。
+   * 出したときにそばにいたら、一度 radius の外へ出てから入り直したときに拾う。
+   */
+  shouldPickUp(distance: number, radius: number): boolean {
+    if (!this.fragment.visible) return false;
+    if (distance >= radius) {
+      this.armed = true;
+      return false;
+    }
+    return this.armed;
   }
 
   get hasFragment(): boolean {

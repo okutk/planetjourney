@@ -50,8 +50,9 @@ export class TalkDirector {
     return this.say('taskDone', now);
   }
 
-  /** 星のかけらを拾ったとき。fragments は手持ちの数。 */
-  collectedFragment(now: number, fragments: number): DialogueLine | null {
+  /** 星のかけらを拾ったとき。collected は拾った通算の数（セリフの「n 個目」）、fragments は手持ちの数。 */
+  collectedFragment(now: number, collected: number, fragments: number): DialogueLine | null {
+    this.facts.collected = collected;
     this.facts.fragments = fragments;
     this.interrupt();
     return this.say('fragment', now);

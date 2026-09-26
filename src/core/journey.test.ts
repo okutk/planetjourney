@@ -41,11 +41,14 @@ describe('Journey', () => {
     expect(journey.collectFragment('origin', 'lantern')).toBe(false);
     expect(journey.isCollected('origin', 'lantern')).toBe(true);
     expect(journey.fragments).toBe(1);
+    expect(journey.collectedCount).toBe(1);
+    expect(journey.nextCost).toBe(STAGE_COSTS[0]);
     for (let i = 1; i < STAGE_COSTS[0]; i++) journey.collectFragment('origin', `g${i}`);
     expect(journey.fragmentsNeeded).toBe(0);
     expect(journey.upgradeProjector()).toBe(true);
     expect(journey.stage).toBe(1);
     expect(journey.fragments).toBe(0);
+    expect(journey.collectedCount).toBe(STAGE_COSTS[0]); // 通算は減らない
     expect(journey.fragmentsNeeded).toBe(STAGE_COSTS[1]);
     // 最大の段階まで上げると、それ以上は上げられない
     let n = 0;
@@ -54,6 +57,7 @@ describe('Journey', () => {
       journey.upgradeProjector();
     }
     expect(journey.fragmentsNeeded).toBeNull();
+    expect(journey.nextCost).toBeNull();
     journey.collectFragment('x', 'extra');
     expect(journey.upgradeProjector()).toBe(false);
   });

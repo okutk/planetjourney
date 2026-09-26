@@ -189,7 +189,7 @@ const shipStage: Stage = {
     {
       // 投影機。かけらが足りれば段階を上げ、足りなければミラが残りの数を言う。最大まで上げたら押せない
       position: new Vector3(SHIP_ROOM.projector.x, 0, SHIP_ROOM.projector.z).add(SHIP_POSITION),
-      label: () => `投影機を強化（かけら ${journey.fragments}/${journey.fragments + (journey.fragmentsNeeded ?? 0)}）`,
+      label: () => `投影機を強化（かけら ${journey.fragments}/${journey.nextCost ?? 0}）`,
       radius: ACTION_RADIUS,
       available: () => journey.fragmentsNeeded !== null,
       act() {
@@ -298,12 +298,12 @@ function createPlanetStage(info: PlanetInfo): PlanetStage {
         gimmickView.update(dt);
         if (!gimmickView.hasFragment) continue;
         playerChest.copy(walker.position).addScaledVector(walker.up, PLAYER_CHEST_HEIGHT);
-        if (playerChest.distanceTo(gimmickView.fragmentPosition) < PICKUP_RADIUS) {
+        if (gimmickView.shouldPickUp(playerChest.distanceTo(gimmickView.fragmentPosition), PICKUP_RADIUS)) {
           gimmickView.setFragment(false);
           if (journey.collectFragment(info.id, def.id)) {
             refreshStatus();
             voice.stop();
-            say(talk.collectedFragment(now, journey.fragments), now);
+            say(talk.collectedFragment(now, journey.collectedCount, journey.fragments), now);
           }
         }
       }

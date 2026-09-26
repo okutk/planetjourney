@@ -67,6 +67,16 @@ export class Journey {
     return true;
   }
 
+  /** 拾ったかけらの通算（使った分を含む）。 */
+  get collectedCount(): number {
+    return this.collected.size;
+  }
+
+  /** 次の段階に上げるのに必要なかけらの数（上げられる段階がなければ null）。 */
+  get nextCost(): number | null {
+    return nextStageCost(this.stage);
+  }
+
   /** 次の段階に上げるのに足りないかけらの数（上げられる段階がなければ null）。 */
   get fragmentsNeeded(): number | null {
     const cost = nextStageCost(this.stage);
