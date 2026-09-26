@@ -1,3 +1,4 @@
+import { visitFacts, writeClockFacts, type PlayLog } from './clock';
 import type { DialogueLine, DialogueSelector, FactValue } from './dialogue';
 import type { Emotion } from './emotion';
 
@@ -21,6 +22,21 @@ export class TalkDirector {
     private readonly emotion: Emotion | null = null,
   ) {
     emotion?.writeFacts(this.facts);
+  }
+
+  /** 端末の時計の「時」（0〜23）を事実に入れる（hour・timeOfDay）。起動時と、ときどき呼ぶ */
+  setClock(hour: number): void {
+    writeClockFacts(hour, this.facts);
+  }
+
+  /**
+   * 起動したとき。前回のプレイの記録から「N 日ぶり」などの事実を入れる（時計が戻っていたら入れない）。
+   * 1 日以上ぶりなら、また会えたのがうれしい（感情の reunion）。
+   */
+  startVisit(log: PlayLog | null, nowMs: number): void {
+    const facts = visitFacts(log, nowMs);
+    Object.assign(this.facts, facts);
+    if (typeof facts.daysAway === 'number' && facts.daysAway >= 1) this.emotion?.feel('reunion');
   }
 
   /**
