@@ -2,6 +2,7 @@ import { visitFacts, writeClockFacts, type PlayLog } from './clock';
 import type { DialogueLine, DialogueSelector, FactValue } from './dialogue';
 import type { Emotion } from './emotion';
 import type { Codex } from './codex';
+import { VisitLog } from './diary';
 import type { MemoryBook } from './memory';
 
 /** 記憶とのつなぎ。現実の時刻（ミリ秒）・場所の表示名・乱数は外から渡す（テストで決められるように） */
@@ -27,6 +28,8 @@ export class TalkDirector {
   /** 会話の判断材料。セリフの {名前} にも使う。place は 'ship'（船の部屋）か 'planet'（星の上） */
   readonly facts: Record<string, FactValue> = { place: 'ship', jumps: 0, warps: 0, idleSeconds: 0 };
   private busyUntil = -Infinity;
+  /** いまいる星の訪問で起きたこと（日記の材料） */
+  private readonly visit = new VisitLog();
 
   constructor(
     private readonly selector: DialogueSelector,
@@ -86,6 +89,7 @@ export class TalkDirector {
     this.emotion?.feel(visits === 1 ? 'discover' : 'arrive');
     // ここで前に起きたこと（here_〇〇）を入れてから、降りたことを覚える
     this.memory?.book.writePlaceFacts(planetId, this.facts);
+    this.visit.start(this.memory?.nowMs() ?? 0);
     this.remember('landed');
   }
 
@@ -96,6 +100,7 @@ export class TalkDirector {
 
   /** いまいる場所で起きた出来事を覚える */
   private remember(kind: string, detail?: string): void {
+    this.visit.note(kind, detail);
     if (!this.memory) return;
     this.memory.book.record(kind, this.placeId, this.memory.nowMs(), detail);
     this.memory.codex?.check();
@@ -119,7 +124,10 @@ export class TalkDirector {
     this.facts.codexTitle = entry.title;
     this.facts.codexRare = entry.rare === true;
     const line = this.say('codex', now);
-    if (line) codex.next();
+    if (line) {
+      codex.next();
+      this.visit.note('codex', entry.title);
+    }
     return line;
   }
 
@@ -234,6 +242,7 @@ export class TalkDirector {
     const before = this.facts.idleSeconds as number;
     const after = moving ? 0 : before + dt;
     this.facts.idleSeconds = after;
+    this.visit.idle(after);
     // セリフの条件は秒単位なので、判定は 1 秒に 1 回で十分（毎フレーム候補の配列を作らない）
     if (moving || Math.floor(after) === Math.floor(before)) return null;
     const ignoredAfter = this.emotion?.rules.ignoredAfter ?? Infinity;
@@ -244,6 +253,20 @@ export class TalkDirector {
       if (line) return line;
     }
     return this.say('idle', now);
+  }
+
+  /**
+   * 星を出るときの日記の材料（いまの星での出来事の回数、星の名前、初めての訪問か、いまの気分と信頼）。
+   * enterShip() の前に呼ぶ。nowMs は現実の時刻
+   */
+  diaryFacts(nowMs: number): Record<string, FactValue> {
+    this.emotion?.writeFacts(this.facts);
+    const facts = this.visit.facts(nowMs);
+    facts.planet = String(this.facts.planet);
+    facts.firstVisit = this.facts.visits === 1;
+    if (this.facts.mood !== undefined) facts.mood = this.facts.mood;
+    if (this.facts.trust !== undefined) facts.trust = this.facts.trust;
+    return facts;
   }
 
   /** 思い出話をする（話せる思い出がなければ null） */

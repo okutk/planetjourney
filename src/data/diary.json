@@ -1,0 +1,89 @@
+{
+  "paragraphs": [
+    { "when": [{ "fact": "firstVisit", "op": "eq", "value": true }], "symbol": "firstVisit" },
+    { "when": [{ "fact": "firstVisit", "op": "ne", "value": true }], "symbol": "again" },
+    { "when": [{ "fact": "leftBehind", "op": "gte", "value": 3 }], "symbol": "leftBehindMany" },
+    { "when": [{ "fact": "leftBehind", "op": "gte", "value": 1 }, { "fact": "leftBehind", "op": "lt", "value": 3 }], "symbol": "leftBehindOnce" },
+    { "when": [{ "fact": "jumps", "op": "gte", "value": 10 }], "symbol": "jumpMany" },
+    { "when": [{ "fact": "jumps", "op": "gte", "value": 1 }, { "fact": "jumps", "op": "lt", "value": 10 }], "symbol": "jumpFew" },
+    { "when": [{ "fact": "solved", "op": "gte", "value": 1 }, { "fact": "lastSolve", "op": "exists" }], "symbol": "solved" },
+    { "when": [{ "fact": "inspected", "op": "gte", "value": 1 }, { "fact": "lastInspect", "op": "exists" }], "symbol": "inspected" },
+    { "when": [{ "fact": "discoveries", "op": "gte", "value": 1 }], "symbol": "discovered" },
+    { "when": [{ "fact": "sat", "op": "gte", "value": 1 }], "symbol": "sat" },
+    { "when": [{ "fact": "mood", "op": "eq", "value": "joyful" }], "symbol": "closingJoyful" },
+    { "when": [{ "fact": "mood", "op": "eq", "value": "anxious" }], "symbol": "closingAnxious" },
+    { "when": [{ "fact": "mood", "op": "ne", "value": "joyful" }, { "fact": "mood", "op": "ne", "value": "anxious" }], "symbol": "closing" }
+  ],
+  "symbols": {
+    "firstVisit": [
+      "初めての{planet}。#firstFeeling#",
+      "今日、初めて{planet}に降りた。#firstFeeling#"
+    ],
+    "firstFeeling": [
+      "データで知っていたのと、ぜんぜん違った。",
+      "データには、においも音も書いてなかった。",
+      "知っていたはずなのに、知らないことばかりだった。"
+    ],
+    "again": [
+      "また{planet}に来た。#againFeeling#",
+      "今日も{planet}。#againFeeling#"
+    ],
+    "againFeeling": [
+      "知っている星なのに、今日も少し違って見えた。",
+      "前に来たときのことを、ちゃんと覚えてる。"
+    ],
+    "leftBehindMany": [
+      "今日、キミは{leftBehind}回もわたしを置いていった。{leftBehind}回目は、少しわざとだったと思う。",
+      "{leftBehind}回、映像が途切れた。キミは走るのが好きすぎる。"
+    ],
+    "leftBehindOnce": [
+      "一度、はぐれそうになった。映像が揺れると、ちょっとこわい。",
+      "腕輪から離れすぎて、少しだけ見えなくなった。……すぐ戻れて、よかった。"
+    ],
+    "jumpMany": [
+      "キミは{jumps}回も跳んだ。#jumpTail#"
+    ],
+    "jumpFew": [
+      "キミは{jumps}回跳んだ。ふわっと浮くのを見るのが、けっこう好き。"
+    ],
+    "jumpTail": [
+      "わたしも、いつか跳んでみたい。",
+      "数えてたの、ばれてないといいな。"
+    ],
+    "solved": [
+      "「{lastSolve}」を、ふたりで解いた。#pride#"
+    ],
+    "pride": [
+      "わたし、役に立てたかな。",
+      "キミが近くにいてくれたから、届いた。"
+    ],
+    "inspected": [
+      "「{lastInspect}」を近くで見た。#wonder#"
+    ],
+    "wonder": [
+      "データより、ずっと細かかった。",
+      "なんだか、ずっと見ていたくなった。"
+    ],
+    "discovered": [
+      "図鑑に{discoveries}つ書き足した。データが、体験に変わった。"
+    ],
+    "sat": [
+      "キミが止まっているあいだ、となりに座って待っていた。#quiet#"
+    ],
+    "quiet": [
+      "何もしない時間も、悪くない。",
+      "静かで、少しだけ眠くなった。……眠らないけど。"
+    ],
+    "closingJoyful": [
+      "今日は、楽しかった。",
+      "たぶん、今日のことはずっと覚えてる。"
+    ],
+    "closingAnxious": [
+      "……次は、そばにいてね。"
+    ],
+    "closing": [
+      "また明日。",
+      "おやすみ、って書いておく。"
+    ]
+  }
+}
