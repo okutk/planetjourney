@@ -1,0 +1,75 @@
+[
+  {
+    "id": "ship.window",
+    "place": "ship",
+    "title": "船の窓",
+    "data": "強化ガラスの観測窓。次の目的地の星が見える。",
+    "impression": "座って眺めると、窓の外の星が、ちょっとだけ近く見える。",
+    "when": { "kind": "sit", "place": "ship" }
+  },
+  {
+    "id": "ship.starmap",
+    "place": "ship",
+    "title": "星図の台",
+    "data": "既知の星のデータがすべて入った投影台。",
+    "impression": "近くで見ると、光の粒がゆっくり回ってる。データの中では、ずっと止まってたのに。",
+    "when": { "kind": "inspect/星図の台", "place": "ship" }
+  },
+  {
+    "id": "origin.ground",
+    "place": "origin",
+    "title": "草原",
+    "data": "表面温度 18℃。地表の大部分は背の低い草に覆われている。",
+    "impression": "ふかふか、って、こういうことなんだ。18℃は、数字よりずっとやさしい。",
+    "when": { "kind": "landed", "place": "origin" }
+  },
+  {
+    "id": "origin.gravity",
+    "place": "origin",
+    "title": "弱い重力",
+    "data": "重力は地球の 0.3 倍。",
+    "impression": "跳ぶと、ゆっくり落ちてくる。0.3 倍って、こんなにふわふわなんだね。",
+    "when": { "kind": "jump", "place": "origin", "count": 5 }
+  },
+  {
+    "id": "origin.lantern",
+    "place": "origin",
+    "title": "消えた灯り",
+    "data": "かつて誰かが灯していた照明の跡、という記録がある。",
+    "impression": "誰が灯してたんだろう。……わたしを作った人たちかな。",
+    "when": { "kind": "inspect/消えた灯り", "place": "origin" }
+  },
+  {
+    "id": "crystal.surface",
+    "place": "crystal",
+    "title": "結晶の地表",
+    "data": "地表の 70% が結晶。",
+    "impression": "光があちこちに跳ねて、ずっときらきらしてる。70% って、全部に見える。",
+    "when": { "kind": "landed", "place": "crystal" }
+  },
+  {
+    "id": "crystal.core",
+    "place": "crystal",
+    "title": "大きな結晶",
+    "data": "光を反射させると道が開く、という記録がある。",
+    "impression": "近くに立つと、わたしの光も映り込む。ホログラムでも、ちゃんと映るんだ。",
+    "when": { "kind": "inspect/大きな結晶", "place": "crystal" }
+  },
+  {
+    "id": "ocean.sea",
+    "place": "ocean",
+    "title": "果てのない海",
+    "data": "陸地なし。星の表面はすべて海。",
+    "impression": "どこまでも青い。音がしないのに、波の音が聞こえる気がする。",
+    "when": { "kind": "landed", "place": "ocean" }
+  },
+  {
+    "id": "ocean.island",
+    "place": "ocean",
+    "title": "浮島",
+    "data": "（データなし）",
+    "impression": "データにない島！ わたしたちが、いちばん最初に見つけたんだよ。",
+    "when": { "kind": "landed", "place": "ocean" },
+    "rare": true
+  }
+]

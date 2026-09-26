@@ -1,6 +1,7 @@
 import { visitFacts, writeClockFacts, type PlayLog } from './clock';
 import type { DialogueLine, DialogueSelector, FactValue } from './dialogue';
 import type { Emotion } from './emotion';
+import type { Codex } from './codex';
 import type { MemoryBook } from './memory';
 
 /** 記憶とのつなぎ。現実の時刻（ミリ秒）・場所の表示名・乱数は外から渡す（テストで決められるように） */
@@ -10,6 +11,8 @@ export interface MemoryLink {
   nowMs(): number;
   nameOf(place: string): string;
   random(): number;
+  /** 図鑑。記憶が増えるたびに、体験に変わった項目がないか確かめる */
+  codex?: Codex;
 }
 
 /** 話し終えてから、次に話し始めるまでの最低限の間（秒） */
@@ -93,7 +96,28 @@ export class TalkDirector {
 
   /** いまいる場所で起きた出来事を覚える */
   private remember(kind: string, detail?: string): void {
-    this.memory?.book.record(kind, this.placeId, this.memory.nowMs(), detail);
+    if (!this.memory) return;
+    this.memory.book.record(kind, this.placeId, this.memory.nowMs(), detail);
+    this.memory.codex?.check();
+  }
+
+  /** ミラが気になる物（name）を見終えたとき。見たことを覚える（図鑑の「見る」体験になる） */
+  inspected(name: string): void {
+    this.remember(`inspect/${name}`);
+  }
+
+  /**
+   * 図鑑の項目が新しく体験に変わっていたら、そのことを話す（話している途中なら待つ）。毎フレーム呼んでよい。
+   * 事実 codexTitle に項目名、codexRare にデータにない発見かを入れる。
+   */
+  announceDiscovery(now: number): DialogueLine | null {
+    const codex = this.memory?.codex;
+    if (!codex || now < this.busyUntil + MIN_GAP) return null;
+    const entry = codex.next();
+    if (!entry) return null;
+    this.facts.codexTitle = entry.title;
+    this.facts.codexRare = entry.rare === true;
+    return this.say('codex', now);
   }
 
   /** プレイヤーが離れすぎて、ミラが映し直されたとき（置いていかれた） */

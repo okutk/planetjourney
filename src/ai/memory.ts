@@ -27,6 +27,8 @@ export interface MemoryData {
 
 /** 思い出話の決まり（src/data/memory.json） */
 export interface MemoryRules {
+  /** 船の表示名（思い出話の {memoryPlace} などに入る。星の名前は星のデータから） */
+  shipName: string;
   /** プレイヤーがこの秒数動かずにいると、思い出話をする */
   reminisceAfter: number;
   /** 一度話した思い出は、この秒数は話さない（ゲーム内の時計） */
@@ -70,6 +72,7 @@ export function parseMemory(data: unknown): MemoryData {
 export function parseMemoryRules(data: unknown): MemoryRules {
   const raw = data as Partial<MemoryRules> | null;
   if (typeof raw !== 'object' || raw === null) throw new Error('記憶の決まりはオブジェクトで書く');
+  if (typeof raw.shipName !== 'string' || raw.shipName === '') throw new Error('shipName がない');
   if (!(typeof raw.reminisceAfter === 'number' && raw.reminisceAfter > 0)) throw new Error('reminisceAfter は正の数');
   if (!(typeof raw.repeatAfter === 'number' && raw.repeatAfter >= 0)) throw new Error('repeatAfter は 0 以上の数');
   if (!(typeof raw.minAge === 'number' && raw.minAge >= 0)) throw new Error('minAge は 0 以上の数');

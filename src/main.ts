@@ -19,6 +19,7 @@ import {
 import { DialogueSelector, parseRules } from './ai/dialogue';
 import { nextPlayLog } from './ai/clock';
 import { Emotion, emotionalStride, emotionVoice, moodFace, parseEmotionRules } from './ai/emotion';
+import { Codex, parseCodex } from './ai/codex';
 import { MemoryBook, parseMemoryRules } from './ai/memory';
 import { TalkDirector } from './ai/talk';
 import { pipopaTimeline, DEFAULT_PIPOPA_CONFIG } from './audio/pipopa';
@@ -26,6 +27,7 @@ import { VoicePlayer } from './audio/voicePlayer';
 import { createRandom } from './core/noise';
 import dialogueData from './data/dialogue.json';
 import memoryData from './data/memory.json';
+import codexData from './data/codex.json';
 import emotionData from './data/emotion.json';
 import { SpeechBubble } from './ui/speechBubble';
 import { BehaviorSelector, Curiosity, type Behavior, type Perception } from './ai/behavior';
@@ -54,6 +56,7 @@ import planetsData from './data/planets.json';
 import { FADE_SECONDS, Fader } from './ui/fade';
 import { localStore } from './ui/localStore';
 import { PerfOverlay } from './ui/perfOverlay';
+import { CodexPanel } from './ui/codexPanel';
 import { StarMapPanel } from './ui/starMap';
 import { TouchControls } from './ui/touchControls';
 import { GimmickView, PICKUP_RADIUS } from './world/gimmickView';
@@ -147,13 +150,21 @@ const loaded = parseSaveData(localStore.load(SAVE_KEY));
 // ミラの記憶（src/data/memory.json）。出来事を覚えてセーブに残し、会話の条件と思い出話にする
 const memoryRules = parseMemoryRules(memoryData);
 const memory = new MemoryBook(memoryRules, loaded?.memory);
+/** 場所の id（星の id か 'ship'）から表示名 */
+function placeName(place: string): string {
+  return place === 'ship' ? memoryRules.shipName : (PLANETS.find((p) => p.id === place)?.name ?? place);
+}
+// 図鑑（src/data/codex.json）。記憶に決まった出来事が残ると、データが体験に変わる
+const codex = new Codex(parseCodex(codexData), memory);
+const codexPanel = new CodexPanel(document.body, codex, placeName);
 const talkRandom = createRandom(Date.now());
 const talk = new TalkDirector(new DialogueSelector(parseRules(dialogueData), talkRandom), speechDuration, emotion, {
   book: memory,
   reminisceAfter: memoryRules.reminisceAfter,
   nowMs: () => Date.now(),
-  nameOf: (place) => (place === 'ship' ? '船' : (PLANETS.find((p) => p.id === place)?.name ?? place)),
+  nameOf: placeName,
   random: talkRandom,
+  codex,
 });
 
 const journey = new Journey();
@@ -467,9 +478,10 @@ function onKeyDown(event: KeyboardEvent): void {
     event.preventDefault();
   } else if (event.code === 'KeyE' || event.code === 'Enter') {
     // 星図の中の操作はボタン自身の click に任せる（Enter で「閉じる」を押した直後に開き直さないように）
-    if (!event.repeat && !starMap.isOpen) actionRequested = true;
+    if (!event.repeat && !starMap.isOpen && !codexPanel.isOpen) actionRequested = true;
   } else if (event.code === 'Escape') {
     starMap.close();
+    codexPanel.close();
   }
 }
 function onKeyUp(event: KeyboardEvent): void {
@@ -642,6 +654,7 @@ function updateBehavior(dt: number, walker: Walker, miraWalker: Walker): void {
       if (miraIntent.amount === 0) miraWalker.faceTowards(miraIntent.direction, TURN_SPEED * dt);
       // 見終えたら一度ついていくに戻る（次の物は選び直し、また「気になる」と言ってから見に行く）
       if (curiosity.update(dt, distance <= INSPECT_ARRIVE)) {
+        talk.inspected(spot.name);
         brain.reset();
         behavior = 'follow';
       }
@@ -681,7 +694,8 @@ renderer.setAnimationLoop((time) => {
 
   // スティック（なければキーボード）の入力を、カメラから見た地表の向きに直す。
   // 星図を開いている間とワープ中は、動かさない
-  const paused = starMap.isOpen || warp.active;
+  const paused = starMap.isOpen || codexPanel.isOpen || warp.active;
+  codexPanel.setButtonVisible(!starMap.isOpen && !warp.active && !fader.busy);
   let stickX = paused ? 0 : touch.stick.x;
   let stickY = paused ? 0 : touch.stick.y;
   if (!paused && stickX === 0 && stickY === 0) {
@@ -749,7 +763,8 @@ renderer.setAnimationLoop((time) => {
     say(talk.jumped(now), now);
   } else if (!paused) {
     // 星図を見ている間とワープ中は「放っておかれている」わけではないので、放置の時間を進めない
-    say(talk.update(dt, amount > 0, now), now);
+    // 図鑑に新しく書いた項目があれば、話せるときに話す
+    say(talk.update(dt, amount > 0, now) ?? talk.announceDiscovery(now), now);
   }
 
   player.position.copy(walker.position);

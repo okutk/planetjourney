@@ -1283,5 +1283,39 @@
       "{memoryPlace}で座って待ってた時間、けっこう好きだった。"
     ],
     "expression": "relaxed"
+  },
+  {
+    "id": "codex.default",
+    "concept": "codex",
+    "criteria": [
+      {
+        "fact": "codexTitle",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "「{codexTitle}」、図鑑に書いておくね。……データじゃなくて、体験として。",
+      "「{codexTitle}」、体験済み。図鑑の色、ひとつ増えたよ。"
+    ],
+    "expression": "happy"
+  },
+  {
+    "id": "codex.rare",
+    "concept": "codex",
+    "criteria": [
+      {
+        "fact": "codexTitle",
+        "op": "exists"
+      },
+      {
+        "fact": "codexRare",
+        "op": "eq",
+        "value": true
+      }
+    ],
+    "lines": [
+      "データにない発見！「{codexTitle}」、図鑑の特別なところに書くね！"
+    ],
+    "expression": "surprised"
   }
 ]
