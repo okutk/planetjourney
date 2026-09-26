@@ -30,16 +30,20 @@ export interface DialogueRule {
   cooldown?: number;
   /** true なら一度しか使わない（「初めての〜」など） */
   once?: boolean;
+  /** 話すときの表情（VRM の preset 名。happy / sad / surprised / relaxed / angry など）。なければ表情を変えない */
+  expression?: string;
 }
 
 /** 選ばれたセリフ。 */
 export interface DialogueLine {
   ruleId: string;
   text: string;
+  /** 話すときの表情（ルールの expression） */
+  expression?: string;
 }
 
 const OPERATORS: readonly Operator[] = ['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'exists', 'missing'];
-const RULE_KEYS = new Set(['id', 'concept', 'criteria', 'lines', 'cooldown', 'once']);
+const RULE_KEYS = new Set(['id', 'concept', 'criteria', 'lines', 'cooldown', 'once', 'expression']);
 
 function isFactValue(value: unknown): value is FactValue {
   return typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean';
@@ -109,6 +113,9 @@ export function parseRules(data: unknown): DialogueRule[] {
       throw new Error(`${where}: cooldown は 0 以上の数`);
     }
     if (rule.once !== undefined && typeof rule.once !== 'boolean') throw new Error(`${where}: once は真偽`);
+    if (rule.expression !== undefined && (typeof rule.expression !== 'string' || rule.expression === '')) {
+      throw new Error(`${where}: expression は表情の名前`);
+    }
     return rule as DialogueRule;
   });
 }
@@ -163,7 +170,9 @@ export class DialogueSelector {
     this.lastUsedAt.set(rule.id, now);
     if (rule.once) this.usedOnce.add(rule.id);
     this.lastLineOf.set(rule.id, line);
-    return { ruleId: rule.id, text: fillLine(line, facts) };
+    const selected: DialogueLine = { ruleId: rule.id, text: fillLine(line, facts) };
+    if (rule.expression !== undefined) selected.expression = rule.expression;
+    return selected;
   }
 
   private isAvailable(rule: DialogueRule, now: number): boolean {

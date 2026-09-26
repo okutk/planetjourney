@@ -300,13 +300,17 @@ const unlockVoice = () => voice.unlock();
 for (const type of ['pointerdown', 'pointerup', 'touchend', 'keydown']) {
   window.addEventListener(type, unlockVoice);
 }
-function say(line: { text: string } | null, now: number): void {
+function say(line: { text: string; expression?: string } | null, now: number): void {
   if (!line) return;
   const { beeps, revealAt } = pipopaTimeline(line.text);
   voice.play(beeps);
   bubble.show(line.text, revealAt, now);
+  // セリフに表情が付いていれば、話し終えるまで（＋少し）その顔をする
+  mira.express(line.expression, speechDuration(line.text) + 1);
 }
 const bubbleAnchor = new Vector3();
+const playerHead = new Vector3();
+const PLAYER_EYE_HEIGHT = 1.0; // プレイヤー（仮の見た目）の目の高さ。ミラが見る位置
 
 // 場所の切り替え。暗転の途中で入れ替え、カメラは新しい場所の後ろへ飛ばす（ズームと見下ろす角度は引き継ぐ）
 const fader = new Fader(document.body);
@@ -441,6 +445,8 @@ renderer.setAnimationLoop((time) => {
   player.position.copy(walker.position);
   walker.orientation(player.quaternion);
   placeMira();
+  // ミラはプレイヤーの顔のあたりを見る（正面から離れすぎていれば前を見る）
+  mira.gazeTarget = playerHead.copy(walker.position).addScaledVector(walker.up, PLAYER_EYE_HEIGHT);
   mira.update(dt, miraIntent.amount, projector.noise, projector.visibility);
   updateCamera(walker, dt);
   renderer.render(scene, camera);
