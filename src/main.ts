@@ -17,7 +17,7 @@ import {
   WebGLRenderer,
 } from 'three';
 import { DialogueSelector, parseRules } from './ai/dialogue';
-import { nextPlayLog, parsePlayLog } from './ai/clock';
+import { nextPlayLog } from './ai/clock';
 import { Emotion, emotionalStride, emotionVoice, moodFace, parseEmotionRules } from './ai/emotion';
 import { TalkDirector } from './ai/talk';
 import { pipopaTimeline, DEFAULT_PIPOPA_CONFIG } from './audio/pipopa';
@@ -28,6 +28,7 @@ import emotionData from './data/emotion.json';
 import { SpeechBubble } from './ui/speechBubble';
 import { DEFAULT_FOLLOW_CONFIG, followIntent, followSlot, seekIntent, type FollowIntent } from './ai/companion';
 import { Projector, TASK_RANGE } from './ai/projection';
+import { parseSaveData, SAVE_VERSION, type SaveData } from './ai/save';
 import { MiraView } from './character/mira';
 import { Journey } from './core/journey';
 import { ACTION_RADIUS, parsePlanets, POD_ANGLE, type PlanetInfo } from './core/planets';
@@ -134,15 +135,29 @@ const talk = new TalkDirector(
   emotion,
 );
 
-// 現実の時刻。前回のプレイ日時を端末内に残し、「N 日ぶり」や深夜の反応に使う（時計が戻っていたら「久しぶり」とは言わない）
-const PLAY_LOG_KEY = 'playLog';
+// セーブとロード。旅の進み（Journey）・ミラの感情・前回のプレイ日時を端末内に残す（src/ai/save.ts）。
+// 読めない・壊れている保存は初めてから。起動はいつも船の部屋からで、窓には最後に降りた星が見える
+const SAVE_KEY = 'save';
+const journey = new Journey();
+const loaded = parseSaveData(localStore.load(SAVE_KEY));
+if (loaded) {
+  journey.restore(loaded.journey);
+  if (loaded.emotion) emotion.restore(loaded.emotion);
+}
+let playLog = loaded?.playLog ?? null;
+/** いまの状態を保存する。旅が変わったとき（降りる・解く・拾う・強化）と、時刻を記録するときに呼ぶ */
+function saveGame(): void {
+  const data: SaveData = { version: SAVE_VERSION, journey: journey.snapshot(), emotion: emotion.snapshot(), playLog };
+  localStore.save(SAVE_KEY, data);
+}
+
+// 現実の時刻。前回のプレイ日時から「N 日ぶり」や深夜の反応をする（時計が戻っていたら「久しぶり」とは言わない）
 const CLOCK_INTERVAL_MS = 60_000;
-let playLog = parsePlayLog(localStore.load(PLAY_LOG_KEY));
 talk.startVisit(playLog, Date.now());
-/** いまの時刻を記録し、時計の事実を更新する。起動時・1 分ごと・画面を離れるときに呼ぶ */
+/** いまの時刻を記録して保存し、時計の事実を更新する。起動時・1 分ごと・画面を離れるときに呼ぶ */
 function recordPlayTime(): void {
   playLog = nextPlayLog(playLog, Date.now());
-  localStore.save(PLAY_LOG_KEY, playLog);
+  saveGame();
   talk.setClock(new Date().getHours());
 }
 recordPlayTime();
@@ -205,7 +220,6 @@ interface Stage {
   reprojectMira(): void;
 }
 
-const journey = new Journey();
 const playerChest = new Vector3();
 const PLAYER_CHEST_HEIGHT = 0.8; // かけらを拾う判定に使う、プレイヤーの胸の高さ
 /** 手持ちのかけらと投影機の段階の表示を更新する。変わったときだけ呼ぶ */
@@ -242,6 +256,7 @@ const shipStage: Stage = {
       act() {
         const need = journey.fragmentsNeeded ?? 0;
         if (journey.upgradeProjector()) {
+          saveGame();
           mira.setSolidity(journey.stage / MAX_FRAGMENT_STAGE);
           refreshStatus();
           say(talk.upgraded(now, journey.stage), now);
@@ -256,6 +271,7 @@ const shipStage: Stage = {
     hud.textContent = '船の部屋';
     shipRoom.group.visible = true;
     journey.board();
+    saveGame();
     talk.enterShip();
     // 窓（-Z 側）の方を向いて、部屋の奥に立つ
     shipWalker.placeAt(0, 1.5, new Vector3(0, 0, -1));
@@ -333,6 +349,7 @@ function createPlanetStage(info: PlanetInfo): PlanetStage {
       hud.textContent = info.name;
       shipRoom.group.visible = false;
       talk.enterPlanet(info.id, info.name, journey.land(info.id));
+      saveGame();
       walker.placeAt(spawn, SPAWN_HEADING);
       this.reprojectMira();
     },
@@ -348,6 +365,7 @@ function createPlanetStage(info: PlanetInfo): PlanetStage {
         if (gimmickView.shouldPickUp(playerChest.distanceTo(gimmickView.fragmentPosition), PICKUP_RADIUS)) {
           gimmickView.setFragment(false);
           if (journey.collectFragment(info.id, def.id)) {
+            saveGame();
             refreshStatus();
             voice.stop();
             say(talk.collectedFragment(now, journey.collectedCount, journey.fragments), now);
@@ -364,6 +382,7 @@ function createPlanetStage(info: PlanetInfo): PlanetStage {
       // 結果のセリフは、頼んだセリフの途中でも打ち切って必ず話す（TalkDirector 側で打ち切る。音もここで止める）
       if (event === 'done') {
         journey.solve(info.id, run.gimmick.id);
+        saveGame();
         gimmickView.setSolved(true);
         gimmickView.setFragment(true);
         voice.stop();
@@ -386,8 +405,8 @@ function createPlanetStage(info: PlanetInfo): PlanetStage {
   return stage;
 }
 
-// 船の窓から見える星。最初は一覧の先頭の星で、ワープするたびに行き先の星に入れ替える
-let planetStage = createPlanetStage(PLANETS[0]);
+// 船の窓から見える星。最後に降りた星（初めてなら一覧の先頭の星）で、ワープするたびに行き先の星に入れ替える
+let planetStage = createPlanetStage(PLANETS.find((info) => info.id === journey.planet) ?? PLANETS[0]);
 let destination: PlanetInfo | null = null; // ワープ中の行き先
 
 scene.add(createStarField(800, 120));

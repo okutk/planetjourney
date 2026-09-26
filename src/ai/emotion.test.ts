@@ -9,6 +9,7 @@ import {
   emotionVoice,
   moodFace,
   parseEmotionRules,
+  parseEmotionValues,
   walkPace,
   type EmotionValues,
 } from './emotion';
@@ -102,6 +103,14 @@ describe('Emotion', () => {
     expect(broken.values.joy).toBe(rules.baseline.joy);
     expect(broken.values.trust).toBe(rules.baseline.trust);
     expect(broken.values.anxiety).toBe(100);
+  });
+
+  it('parseEmotionValues は 4 つの感情がそろった値だけを受け付け、範囲に収める', () => {
+    expect(parseEmotionValues(values({ joy: 70 }))).toEqual(values({ joy: 70 }));
+    expect(parseEmotionValues(values({ anxiety: 250 }))?.anxiety).toBe(100);
+    expect(parseEmotionValues(null)).toBeNull();
+    expect(parseEmotionValues({ joy: 1, curiosity: 2, anxiety: 3 })).toBeNull();
+    expect(parseEmotionValues(values({ trust: Infinity }))).toBeNull();
   });
 });
 

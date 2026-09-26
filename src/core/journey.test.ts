@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Journey } from './journey';
+import { Journey, parseJourneySave } from './journey';
 import { MAX_FRAGMENT_STAGE, STAGE_COSTS } from './projector';
 
 describe('Journey', () => {
@@ -60,5 +60,57 @@ describe('Journey', () => {
     expect(journey.nextCost).toBeNull();
     journey.collectFragment('x', 'extra');
     expect(journey.upgradeProjector()).toBe(false);
+  });
+
+  it('保存した値を JSON を通して戻すと、同じ旅になる（手持ちのかけらも求め直す）', () => {
+    const journey = new Journey();
+    journey.land('origin');
+    journey.land('crystal');
+    journey.board();
+    journey.solve('origin', 'lantern');
+    journey.solve('crystal', 'stone');
+    journey.collectFragment('origin', 'lantern');
+    journey.collectFragment('crystal', 'stone');
+    journey.upgradeProjector();
+    journey.collectFragment('crystal', 'gap');
+
+    const save = parseJourneySave(JSON.parse(JSON.stringify(journey.snapshot())));
+    expect(save).not.toBeNull();
+    const restored = new Journey();
+    restored.restore(save!);
+    expect(restored.place).toBe('ship');
+    expect(restored.planet).toBe('crystal');
+    expect(restored.visits('origin')).toBe(1);
+    expect(restored.visits('crystal')).toBe(1);
+    expect(restored.isSolved('origin', 'lantern')).toBe(true);
+    expect(restored.isSolved('origin', 'stone')).toBe(false);
+    expect(restored.isCollected('crystal', 'gap')).toBe(true);
+    expect(restored.collectedCount).toBe(3);
+    expect(restored.stage).toBe(1);
+    expect(restored.fragments).toBe(3 - STAGE_COSTS[0]);
+    expect(restored.snapshot()).toEqual(journey.snapshot());
+  });
+
+  it('壊れた保存は受け付けない', () => {
+    const good = new Journey();
+    good.land('origin');
+    const base = good.snapshot();
+    expect(parseJourneySave(base)).toEqual(base);
+    expect(parseJourneySave(null)).toBeNull();
+    expect(parseJourneySave('x')).toBeNull();
+    expect(parseJourneySave({ ...base, place: 'moon' })).toBeNull();
+    expect(parseJourneySave({ ...base, place: 'planet', planet: null })).toBeNull();
+    expect(parseJourneySave({ ...base, landings: { origin: 0 } })).toBeNull();
+    expect(parseJourneySave({ ...base, landings: { origin: 1.5 } })).toBeNull();
+    expect(parseJourneySave({ ...base, landings: [] })).toBeNull();
+    expect(parseJourneySave({ ...base, solved: ['lantern'] })).toBeNull();
+    expect(parseJourneySave({ ...base, collected: [1] })).toBeNull();
+    expect(parseJourneySave({ ...base, stage: -1 })).toBeNull();
+    expect(parseJourneySave({ ...base, stage: MAX_FRAGMENT_STAGE + 1 })).toBeNull();
+    // 拾ったかけらが段階に使った数より少ないと、手持ちが負になる
+    expect(parseJourneySave({ ...base, stage: 1, collected: ['origin/lantern'] })).toBeNull();
+    // 重なった id はひとつにまとめる
+    const doubled = parseJourneySave({ ...base, solved: ['origin/lantern', 'origin/lantern'] });
+    expect(doubled?.solved).toEqual(['origin/lantern']);
   });
 });
