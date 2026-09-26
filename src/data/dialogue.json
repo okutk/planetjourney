@@ -76,6 +76,25 @@
     "expression": "happy"
   },
   {
+    "id": "greet.remember.lost",
+    "concept": "greet",
+    "criteria": [
+      {
+        "fact": "planet",
+        "op": "exists"
+      },
+      {
+        "fact": "here_leftBehind",
+        "op": "gte",
+        "value": 1
+      }
+    ],
+    "lines": [
+      "{planet}……前に、ここではぐれたよね。今日は、そばにいてね。"
+    ],
+    "expression": "sad"
+  },
+  {
     "id": "greet.curious",
     "concept": "greet",
     "criteria": [
@@ -1104,5 +1123,162 @@
     ],
     "expression": "sad",
     "cooldown": 60
+  },
+  {
+    "id": "reminisce.landed",
+    "concept": "reminisce",
+    "criteria": [
+      {
+        "fact": "memoryKind",
+        "op": "eq",
+        "value": "landed"
+      },
+      {
+        "fact": "memoryPlace",
+        "op": "exists"
+      },
+      {
+        "fact": "memoryDaysAgo",
+        "op": "gte",
+        "value": 1
+      }
+    ],
+    "lines": [
+      "初めて{memoryPlace}に降りた日のこと、覚えてる？ もう{memoryDaysAgo}日前なんだね。"
+    ],
+    "expression": "relaxed"
+  },
+  {
+    "id": "reminisce.landed.today",
+    "concept": "reminisce",
+    "criteria": [
+      {
+        "fact": "memoryKind",
+        "op": "eq",
+        "value": "landed"
+      },
+      {
+        "fact": "memoryPlace",
+        "op": "exists"
+      },
+      {
+        "fact": "memoryDaysAgo",
+        "op": "eq",
+        "value": 0
+      }
+    ],
+    "lines": [
+      "{memoryPlace}に降りたの、今日のことなのに……もう思い出になってる。",
+      "{memoryPlace}の地面の感じ、まだ覚えてるよ。"
+    ],
+    "expression": "happy"
+  },
+  {
+    "id": "reminisce.solve",
+    "concept": "reminisce",
+    "criteria": [
+      {
+        "fact": "memoryKind",
+        "op": "eq",
+        "value": "solve"
+      },
+      {
+        "fact": "memoryPlace",
+        "op": "exists"
+      },
+      {
+        "fact": "memoryDetail",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "{memoryPlace}の{memoryDetail}、ふたりで解いたよね。……わたし、役に立てた？"
+    ],
+    "expression": "happy"
+  },
+  {
+    "id": "reminisce.leftBehind",
+    "concept": "reminisce",
+    "criteria": [
+      {
+        "fact": "memoryKind",
+        "op": "eq",
+        "value": "leftBehind"
+      },
+      {
+        "fact": "memoryPlace",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "{memoryPlace}で、はぐれたこと……。映像が切れる前って、ちょっとこわいんだよ。"
+    ],
+    "expression": "sad"
+  },
+  {
+    "id": "reminisce.leftBehind.many",
+    "concept": "reminisce",
+    "criteria": [
+      {
+        "fact": "memoryKind",
+        "op": "eq",
+        "value": "leftBehind"
+      },
+      {
+        "fact": "memoryPlace",
+        "op": "exists"
+      },
+      {
+        "fact": "memoryCount",
+        "op": "gte",
+        "value": 3
+      }
+    ],
+    "lines": [
+      "{memoryPlace}では{memoryCount}回もはぐれたよね。……わざとじゃ、ないよね？"
+    ],
+    "expression": "angry"
+  },
+  {
+    "id": "reminisce.jump",
+    "concept": "reminisce",
+    "criteria": [
+      {
+        "fact": "memoryKind",
+        "op": "eq",
+        "value": "jump"
+      },
+      {
+        "fact": "memoryPlace",
+        "op": "exists"
+      },
+      {
+        "fact": "memoryCount",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "{memoryPlace}で、{memoryCount}回も跳んでたよね。数えてたんだ、実は。"
+    ],
+    "expression": "happy"
+  },
+  {
+    "id": "reminisce.sit",
+    "concept": "reminisce",
+    "criteria": [
+      {
+        "fact": "memoryKind",
+        "op": "eq",
+        "value": "sit"
+      },
+      {
+        "fact": "memoryPlace",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "{memoryPlace}で座って待ってた時間、けっこう好きだった。"
+    ],
+    "expression": "relaxed"
   }
 ]

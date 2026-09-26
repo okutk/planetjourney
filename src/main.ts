@@ -19,11 +19,13 @@ import {
 import { DialogueSelector, parseRules } from './ai/dialogue';
 import { nextPlayLog, parsePlayLog } from './ai/clock';
 import { Emotion, emotionalStride, emotionVoice, moodFace, parseEmotionRules } from './ai/emotion';
+import { MemoryBook, parseMemory, parseMemoryRules } from './ai/memory';
 import { TalkDirector } from './ai/talk';
 import { pipopaTimeline, DEFAULT_PIPOPA_CONFIG } from './audio/pipopa';
 import { VoicePlayer } from './audio/voicePlayer';
 import { createRandom } from './core/noise';
 import dialogueData from './data/dialogue.json';
+import memoryData from './data/memory.json';
 import emotionData from './data/emotion.json';
 import { SpeechBubble } from './ui/speechBubble';
 import { BehaviorSelector, Curiosity, type Behavior, type Perception } from './ai/behavior';
@@ -136,11 +138,20 @@ function speechDuration(text: string): number {
   const { revealAt } = pipopaTimeline(text, config);
   return (revealAt.at(-1) ?? 0) + config.charInterval;
 }
-const talk = new TalkDirector(
-  new DialogueSelector(parseRules(dialogueData), createRandom(Date.now())),
-  speechDuration,
-  emotion,
-);
+// ミラの記憶（src/data/memory.json）。出来事を覚えて端末内に残し、会話の条件と思い出話にする
+const EMOTION_KEY = 'emotion';
+const MEMORY_KEY = 'memory';
+emotion.restore(localStore.load(EMOTION_KEY));
+const memoryRules = parseMemoryRules(memoryData);
+const memory = new MemoryBook(memoryRules, parseMemory(localStore.load(MEMORY_KEY)));
+const talkRandom = createRandom(Date.now());
+const talk = new TalkDirector(new DialogueSelector(parseRules(dialogueData), talkRandom), speechDuration, emotion, {
+  book: memory,
+  reminisceAfter: memoryRules.reminisceAfter,
+  nowMs: () => Date.now(),
+  nameOf: (place) => (place === 'ship' ? '船' : (PLANETS.find((p) => p.id === place)?.name ?? place)),
+  random: talkRandom,
+});
 
 // 現実の時刻。前回のプレイ日時を端末内に残し、「N 日ぶり」や深夜の反応に使う（時計が戻っていたら「久しぶり」とは言わない）
 const PLAY_LOG_KEY = 'playLog';
@@ -151,6 +162,12 @@ talk.startVisit(playLog, Date.now());
 function recordPlayTime(): void {
   playLog = nextPlayLog(playLog, Date.now());
   localStore.save(PLAY_LOG_KEY, playLog);
+  // 感情（信頼など）と記憶も、同じ時に残す。記憶は変わったときだけ書く
+  localStore.save(EMOTION_KEY, emotion.snapshot());
+  if (memory.dirty) {
+    localStore.save(MEMORY_KEY, memory.toJSON());
+    memory.dirty = false;
+  }
   talk.setClock(new Date().getHours());
 }
 recordPlayTime();
@@ -672,7 +689,7 @@ renderer.setAnimationLoop((time) => {
   miraWalker.step(miraInput, dt);
   // 投影範囲。消え切った瞬間に、腕輪のそば（定位置）へ映し直す
   if (projector.update(walker.position.distanceTo(miraWalker.position), dt)) {
-    emotion.feel('leftBehind'); // 置いていかれて、少し不安になる
+    talk.leftBehind(); // 置いていかれて少し不安になり、そのことを覚える
     stage.reprojectMira();
     placeMira();
     mira.settle();
