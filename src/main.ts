@@ -79,6 +79,8 @@ const walker = new SphericalWalker({
   planetRadius: PLANET_RADIUS,
   surfaceRadius: (up) => terrain.radiusAt(up),
 });
+// 出現位置は、配置物をあけておく方向と同じにする
+walker.placeAt(SPAWN_DIRECTION, new Vector3(0, 0, 1));
 
 scene.add(createStarField(800, 120));
 

@@ -34,10 +34,21 @@ export function valueNoise3(x: number, y: number, z: number, seed = 0): number {
   const tx = smooth(x - x0);
   const ty = smooth(y - y0);
   const tz = smooth(z - z0);
-  const c = (dx: number, dy: number, dz: number) => lattice(x0 + dx, y0 + dy, z0 + dz, seed);
+  // 8 つの格子点の値を補間する（毎フレーム呼ばれるので、クロージャなどは作らない）
+  const x1 = x0 + 1;
+  const y1 = y0 + 1;
+  const z1 = z0 + 1;
   return lerp(
-    lerp(lerp(c(0, 0, 0), c(1, 0, 0), tx), lerp(c(0, 1, 0), c(1, 1, 0), tx), ty),
-    lerp(lerp(c(0, 0, 1), c(1, 0, 1), tx), lerp(c(0, 1, 1), c(1, 1, 1), tx), ty),
+    lerp(
+      lerp(lattice(x0, y0, z0, seed), lattice(x1, y0, z0, seed), tx),
+      lerp(lattice(x0, y1, z0, seed), lattice(x1, y1, z0, seed), tx),
+      ty,
+    ),
+    lerp(
+      lerp(lattice(x0, y0, z1, seed), lattice(x1, y0, z1, seed), tx),
+      lerp(lattice(x0, y1, z1, seed), lattice(x1, y1, z1, seed), tx),
+      ty,
+    ),
     tz,
   );
 }

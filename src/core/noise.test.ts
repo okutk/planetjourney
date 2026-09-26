@@ -70,6 +70,11 @@ describe('scatterDirections', () => {
     }
   });
 
+  it('条件に合う方向がない設定でも止まる', () => {
+    const dirs = scatterDirections(5, createRandom(4), new Vector3(0, 1, 0), Math.PI, () => new Vector3());
+    expect(dirs.length).toBeLessThan(5);
+  });
+
   it('同じ種なら同じ配置になる', () => {
     const avoid = new Vector3(0, 1, 0);
     const a = scatterDirections(10, createRandom(8), avoid, 0.3, () => new Vector3());
