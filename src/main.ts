@@ -449,7 +449,7 @@ renderer.setAnimationLoop((time) => {
   player.position.copy(walker.position);
   walker.orientation(player.quaternion);
   placeMira();
-  mira.update(dt);
+  mira.update(dt, miraIntent.amount);
   updateCamera(walker, dt);
   renderer.render(scene, camera);
 

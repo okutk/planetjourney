@@ -1,12 +1,11 @@
 import { Box3, Group, type Object3D } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { VRM, VRMLoaderPlugin, VRMMetaLoaderPlugin, VRMUtils, type VRMHumanBoneName } from '@pixiv/three-vrm';
+import { VRM, VRMLoaderPlugin, VRMMetaLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+import { buildProceduralClips, MiraMotion, type MotionClips } from './miraMotion';
 import { MiraPlaceholder } from './miraPlaceholder';
 
 /** ミラのモデル。同一オリジンの public/models から読む（Vite の base が './' でも動くよう相対パス） */
 const MODEL_URL = `${import.meta.env.BASE_URL}models/mira.vrm`;
-/** 読み込んだ直後は T ポーズなので、腕を体の横まで下ろしておく角度（ラジアン）。モーションが入るまでの仮の姿勢 */
-const ARM_DOWN_ANGLE = 1.25;
 /** 吹き出しなどを出す高さ。頭のてっぺんからこれだけ上 */
 const HEAD_MARGIN = 0.15;
 /** 仮表示（カプセル）のときの、頭の上の高さ */
@@ -17,7 +16,8 @@ const tmpBox = new Box3();
 /**
  * ミラの見た目。足元が原点、+Z が正面（VRM 1.0 の向きと同じ）。
  * 最初は仮表示（カプセル）を出し、VRM の読み込みが終わったら入れ替える。読み込みに失敗したら仮表示のまま。
- * 毎フレーム update(dt) を呼ぶと、揺れもの（SpringBone）などが動く。不要になったら dispose() する。
+ * 毎フレーム update(dt, walkAmount) を呼ぶと、モーション（待機・歩き）と揺れもの（SpringBone）が動く。
+ * 不要になったら dispose() する。
  */
 export class MiraView {
   readonly group = new Group();
@@ -25,11 +25,16 @@ export class MiraView {
   height = PLACEHOLDER_HEIGHT;
   /** 読み込んだ VRM。仮表示のあいだは null */
   vrm: VRM | null = null;
-  private placeholder: MiraPlaceholder | null = new MiraPlaceholder();
+  private placeholder: MiraPlaceholder | null;
+  private motion: MiraMotion | null = null;
+  /** 差し替え用のモーション。null なら手続きのモーションを使う */
+  private clips: MotionClips | null = null;
   private disposed = false;
 
   constructor() {
-    this.group.add(this.placeholder!.group);
+    const placeholder = new MiraPlaceholder();
+    this.placeholder = placeholder;
+    this.group.add(placeholder.group);
     void this.load();
   }
 
@@ -67,11 +72,6 @@ export class MiraView {
     vrm.scene.traverse((object: Object3D) => {
       object.frustumCulled = false;
     });
-    // T ポーズのままだと不自然なので、腕を下ろす（正規化ボーンに書くと update() で実ボーンへ写る）
-    this.rotateArm(vrm, 'leftUpperArm', -ARM_DOWN_ANGLE);
-    this.rotateArm(vrm, 'rightUpperArm', ARM_DOWN_ANGLE);
-    vrm.humanoid.update();
-
     // 頭の上の高さは、実際のモデルの大きさから決める（group に入れる前なので、モデルの座標系で測れる）
     vrm.scene.updateWorldMatrix(true, true);
     tmpBox.setFromObject(vrm.scene);
@@ -81,16 +81,28 @@ export class MiraView {
     this.placeholder = null;
     this.vrm = vrm;
     this.group.add(vrm.scene);
+    this.motion = new MiraMotion(vrm.scene, this.clips ?? buildProceduralClips(vrm));
+    // T ポーズのまま 1 フレームも見せないよう、最初の姿勢をすぐ反映する
+    this.motion.update(0, 0);
+    vrm.update(0);
     this.settle();
   }
 
-  private rotateArm(vrm: VRM, bone: VRMHumanBoneName, angle: number): void {
-    const node = vrm.humanoid.getNormalizedBoneNode(bone);
-    if (node) node.rotation.z = angle;
+  /**
+   * モーションを差し替える（Mixamo などからリターゲットした AnimationClip）。
+   * クリップは VRM の正規化ボーンを対象にしたもの。モデルの読み込み前に呼んでもよい
+   */
+  setClips(clips: MotionClips): void {
+    this.clips = clips;
+    if (this.vrm) {
+      this.motion?.dispose();
+      this.motion = new MiraMotion(this.vrm.scene, clips);
+    }
   }
 
-  /** 毎フレーム呼ぶ。位置と向きを group に入れたあと、描画の前に呼ぶこと。 */
-  update(dt: number): void {
+  /** 毎フレーム呼ぶ。位置と向きを group に入れたあと、描画の前に呼ぶこと。walkAmount は歩く量（0〜1） */
+  update(dt: number, walkAmount: number): void {
+    this.motion?.update(dt, walkAmount);
     this.vrm?.update(dt);
   }
 
@@ -108,6 +120,8 @@ export class MiraView {
     this.disposed = true;
     this.placeholder?.dispose();
     this.placeholder = null;
+    this.motion?.dispose();
+    this.motion = null;
     if (this.vrm) {
       VRMUtils.deepDispose(this.vrm.scene);
       this.vrm.scene.removeFromParent();
