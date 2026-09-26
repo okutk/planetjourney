@@ -93,6 +93,75 @@
     ]
   },
   {
+    "id": "starmap.first",
+    "concept": "starmap",
+    "criteria": [
+      {
+        "fact": "place",
+        "op": "eq",
+        "value": "ship"
+      },
+      {
+        "fact": "warps",
+        "op": "eq",
+        "value": 0
+      }
+    ],
+    "lines": [
+      "これが星図。どの星のデータも、全部ここにある。……行ったことは、まだないけど。"
+    ],
+    "once": true
+  },
+  {
+    "id": "starmap.default",
+    "concept": "starmap",
+    "criteria": [
+      {
+        "fact": "place",
+        "op": "eq",
+        "value": "ship"
+      }
+    ],
+    "lines": [
+      "次はどこへ行く？",
+      "データで見るだけじゃ、分からないことばかりだったね。次はどこ？"
+    ],
+    "cooldown": 20
+  },
+  {
+    "id": "warp.first",
+    "concept": "warp",
+    "criteria": [
+      {
+        "fact": "warps",
+        "op": "eq",
+        "value": 1
+      },
+      {
+        "fact": "destination",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "{destination}へ、ワープ開始。……しっかりつかまって。つかまる所、ないけど。"
+    ],
+    "once": true
+  },
+  {
+    "id": "warp.default",
+    "concept": "warp",
+    "criteria": [
+      {
+        "fact": "destination",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "{destination}へ。座標、入力完了。",
+      "{destination}か。今度は何が見つかるかな。"
+    ]
+  },
+  {
     "id": "jump.first",
     "concept": "jump",
     "criteria": [
