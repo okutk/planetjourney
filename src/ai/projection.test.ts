@@ -1,5 +1,5 @@
-import { TASK_RANGE, describe, expect, it } from 'vitest';
-import { DEFAULT_PROJECTION_CONFIG, Projector, projectionNoise } from './projection';
+import { describe, expect, it } from 'vitest';
+import { DEFAULT_PROJECTION_CONFIG, Projector, projectionNoise, TASK_RANGE } from './projection';
 
 const DT = 1 / 60;
 const { range, noiseFrom, outsideGrace, fadeDuration } = DEFAULT_PROJECTION_CONFIG;
