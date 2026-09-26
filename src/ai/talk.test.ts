@@ -181,10 +181,15 @@ describe('TalkDirector', () => {
     emotion.feel('leftBehind');
     emotion.feel('leftBehind');
     const joyBefore = emotion.values.joy;
+    // 不安なときは、ふつうの放置のセリフ（20 秒）より早く、不安なセリフを話す
     let said = null;
-    for (let t = 0; t < 46; t += 0.5) said = said ?? director.update(0.5, false, 100 + t);
-    for (let t = 0; t < 40; t += 0.5) director.update(0.5, false, 200 + t);
+    let t = 0;
+    for (; t < 20 && !said; t += 0.5) said = director.update(0.5, false, 100 + t);
     expect(said?.ruleId).toBe('idle.anxious');
+    expect(director.facts.idleSeconds).toBeLessThan(11);
+    expect(emotion.values.joy).toBe(joyBefore);
+    // さらに ignoredAfter 秒まで放っておかれると、さみしくなる（ignored で喜びが下がる）
+    for (; t < emotionRules.ignoredAfter + 1; t += 0.5) director.update(0.5, false, 100 + t);
     expect(emotion.values.joy).toBeLessThan(joyBefore);
   });
 });
