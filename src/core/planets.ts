@@ -1,4 +1,13 @@
+import { GIMMICK_KINDS, type GimmickDef, type GimmickKind } from './gimmick';
 import type { TerrainConfig } from './terrain';
+
+/** 調べられる物から、この距離まで近づくとボタンが出る */
+export const ACTION_RADIUS = 1.4;
+/**
+ * 着陸ポッドを出現位置の後ろに置く角度（ラジアン）。降りた瞬間に「船に戻る」が出ないよう、
+ * ボタンの出る距離より確実に離す（半径 5 の星を基準にした角度なので、大きい星ではもう少し離れる）
+ */
+export const POD_ANGLE = (ACTION_RADIUS * 1.5) / 5;
 
 export type PropKind = 'tree' | 'rock' | 'crystal';
 const PROP_KINDS: readonly PropKind[] = ['tree', 'rock', 'crystal'];
@@ -32,9 +41,12 @@ export interface PlanetInfo {
   look: PlanetLook;
   /** 出現位置（星の中心から見た方向。長さは 1 でなくてよい）。海のある星では陸を指すこと */
   spawn: [number, number, number];
+  /** ミラに頼んで解く仕掛け */
+  gimmicks: GimmickDef[];
 }
 
-const KEYS = new Set(['id', 'name', 'data', 'available', 'terrain', 'look', 'spawn']);
+const KEYS = new Set(['id', 'name', 'data', 'available', 'terrain', 'look', 'spawn', 'gimmicks']);
+const GIMMICK_KEYS = new Set(['id', 'kind', 'name', 'direction']);
 const TERRAIN_KEYS = new Set(['radius', 'amplitude', 'frequency', 'octaves', 'seed', 'seaLevel']);
 const LOOK_KEYS = new Set(['groundColor', 'seaColor', 'props', 'seed']);
 const COLOR = /^#[0-9a-f]{6}$/i;
@@ -88,14 +100,28 @@ export function parsePlanets(raw: unknown): PlanetInfo[] {
       if (typeof prop.color !== 'string' || !COLOR.test(prop.color)) throw new Error(`${where}: ${prop.kind} の color は #rrggbb`);
     }
 
-    const spawn = planet.spawn;
-    if (!Array.isArray(spawn) || spawn.length !== 3 || !spawn.every(isNumber) || Math.hypot(...spawn) === 0) {
-      throw new Error(`${where}: spawn は長さ 0 でない [x, y, z]`);
+    if (!isDirection(planet.spawn)) throw new Error(`${where}: spawn は長さ 0 でない [x, y, z]`);
+
+    if (!Array.isArray(planet.gimmicks)) throw new Error(`${where}: gimmicks は配列`);
+    const gimmickIds = new Set<string>();
+    for (const gimmick of planet.gimmicks as Partial<GimmickDef>[]) {
+      const gw = `${where} の仕掛け ${String(gimmick?.id)}`;
+      checkKeys(gimmick, GIMMICK_KEYS, gw);
+      if (typeof gimmick.id !== 'string' || gimmick.id === '') throw new Error(`${gw}: id がない`);
+      if (gimmickIds.has(gimmick.id)) throw new Error(`${gw}: id が重複している`);
+      gimmickIds.add(gimmick.id);
+      if (!GIMMICK_KINDS.includes(gimmick.kind as GimmickKind)) throw new Error(`${gw}: 知らない種類 ${String(gimmick.kind)}`);
+      if (typeof gimmick.name !== 'string' || gimmick.name === '') throw new Error(`${gw}: name がない`);
+      if (!isDirection(gimmick.direction)) throw new Error(`${gw}: direction は長さ 0 でない [x, y, z]`);
     }
     return planet as PlanetInfo;
   });
   if (!planets.some((planet) => planet.available)) throw new Error('行ける星が 1 つもない');
   return planets;
+}
+
+function isDirection(value: unknown): value is [number, number, number] {
+  return Array.isArray(value) && value.length === 3 && value.every(isNumber) && Math.hypot(...(value as number[])) > 0;
 }
 
 function checkKeys(object: object | undefined, allowed: Set<string>, where: string): void {

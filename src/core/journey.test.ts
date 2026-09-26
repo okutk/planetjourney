@@ -20,4 +20,15 @@ describe('Journey', () => {
     expect(journey.land('crystal')).toBe(1);
     expect(journey.visits('origin')).toBe(2);
   });
+
+  it('解いた仕掛けを星ごとに覚え、同じ仕掛けは二重に数えない', () => {
+    const journey = new Journey();
+    expect(journey.isSolved('origin', 'lantern')).toBe(false);
+    journey.solve('origin', 'lantern');
+    journey.solve('origin', 'lantern');
+    journey.solve('crystal', 'lantern');
+    expect(journey.isSolved('origin', 'lantern')).toBe(true);
+    expect(journey.isSolved('origin', 'stone')).toBe(false);
+    expect(journey.solvedCount).toBe(2);
+  });
 });

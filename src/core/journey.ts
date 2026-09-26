@@ -10,6 +10,7 @@ export class Journey {
   /** いまいる星の id（船にいるときは、最後に降りた星。まだどこにも降りていなければ null） */
   planet: string | null = null;
   private readonly landings = new Map<string, number>();
+  private readonly solved = new Set<string>();
 
   /** 星（id）に降りる。その星に降りた回数（初めてなら 1）を返す。 */
   land(planet: string): number {
@@ -28,5 +29,20 @@ export class Journey {
   /** その星（id）に降りた回数。 */
   visits(planet: string): number {
     return this.landings.get(planet) ?? 0;
+  }
+
+  /** 星の仕掛けを解いたことを記録する。 */
+  solve(planet: string, gimmick: string): void {
+    this.solved.add(`${planet}/${gimmick}`);
+  }
+
+  /** その仕掛けを解いたことがあるか。 */
+  isSolved(planet: string, gimmick: string): boolean {
+    return this.solved.has(`${planet}/${gimmick}`);
+  }
+
+  /** 解いた仕掛けの数。 */
+  get solvedCount(): number {
+    return this.solved.size;
   }
 }
