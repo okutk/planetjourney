@@ -130,3 +130,13 @@ body {
   border-bottom: 0;
   border-top-color: rgba(255, 255, 255, 0.92);
 }
+
+/* 画面には出さず、読み上げだけに使う要素 */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

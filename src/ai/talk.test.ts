@@ -15,16 +15,23 @@ describe('TalkDirector', () => {
     expect(createDirector().arrive(0)?.ruleId).toBe('greet.first');
   });
 
-  it('話している途中とその直後は、ジャンプしても割り込まない', () => {
+  it('話している途中とその直後は割り込まず、次に反応できたジャンプで初回のセリフを言う', () => {
     const director = createDirector();
     director.arrive(0);
     expect(director.isSpeaking(1)).toBe(true);
     expect(director.jumped(1)).toBeNull();
     expect(director.jumped(3)).toBeNull(); // 話し終えて 1.5 秒たつまでは間を置く
     expect(director.isSpeaking(3)).toBe(false);
-    // 3 回目のジャンプ。初回用の jump.first（jumps eq 1）は選ばれない
-    expect(director.jumped(4)?.ruleId).toBe('jump.default');
+    expect(director.jumped(4)?.ruleId).toBe('jump.first');
     expect(director.facts.jumps).toBe(3);
+    expect(director.jumped(10)?.ruleId).toBe('jump.default'); // 初回のセリフは一度だけ
+  });
+
+  it('跳んでいる間は、放っておかれているとは数えない', () => {
+    const director = createDirector();
+    director.update(10, false, 0);
+    director.jumped(10);
+    expect(director.facts.idleSeconds).toBe(0);
   });
 
   it('初めてのジャンプには、初回のセリフで反応する', () => {

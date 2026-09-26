@@ -29,13 +29,17 @@ export class TalkDirector {
   /** プレイヤーがジャンプしたとき。 */
   jumped(now: number): DialogueLine | null {
     this.facts.jumps = (this.facts.jumps as number) + 1;
+    this.facts.idleSeconds = 0; // 跳んでいるのは遊んでいるということなので、放置の時間は数え直す
     return this.say('jump', now);
   }
 
   /** 毎フレーム呼ぶ。止まっている時間を数え、しばらく放っておかれたら話しかける。 */
   update(dt: number, moving: boolean, now: number): DialogueLine | null {
-    this.facts.idleSeconds = moving ? 0 : (this.facts.idleSeconds as number) + dt;
-    if (moving) return null;
+    const before = this.facts.idleSeconds as number;
+    const after = moving ? 0 : before + dt;
+    this.facts.idleSeconds = after;
+    // セリフの条件は秒単位なので、判定は 1 秒に 1 回で十分（毎フレーム候補の配列を作らない）
+    if (moving || Math.floor(after) === Math.floor(before)) return null;
     return this.say('idle', now);
   }
 

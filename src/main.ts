@@ -195,10 +195,12 @@ const talk = new TalkDirector(
 );
 const voice = new VoicePlayer();
 const bubble = new SpeechBubble(document.body);
-// 音はユーザーが画面に触れる（キーを押す）まで鳴らせないので、最初の操作で準備する
+// 音はユーザーが画面に触れる（キーを押す）まで鳴らせないので、最初の操作で準備する。
+// タッチの pointerdown はユーザー操作として数えられないブラウザがあるので、pointerup・touchend でも呼ぶ
 const unlockVoice = () => voice.unlock();
-window.addEventListener('pointerdown', unlockVoice);
-window.addEventListener('keydown', unlockVoice);
+for (const type of ['pointerdown', 'pointerup', 'touchend', 'keydown']) {
+  window.addEventListener(type, unlockVoice);
+}
 function speak(text: string, now: number): void {
   const { beeps, revealAt } = pipopaTimeline(text);
   voice.play(beeps);

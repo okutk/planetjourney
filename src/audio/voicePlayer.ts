@@ -27,7 +27,8 @@ export class VoicePlayer {
   /** 音の並びを鳴らす。前のセリフが鳴っていたら止めてから鳴らす。まだ unlock されていなければ何もしない。 */
   play(beeps: readonly Beep[]): void {
     const { context, output } = this;
-    if (!context || !output) return;
+    // 準備前や、まだ止まっている（suspended）間は鳴らさない（再開した瞬間にまとめて鳴るのを防ぐ）
+    if (!context || !output || context.state !== 'running') return;
     this.stop();
     const now = context.currentTime + 0.02;
     for (const beep of beeps) {

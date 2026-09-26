@@ -7,6 +7,8 @@ const HOLD = 2.5;
  */
 export class SpeechBubble {
   private readonly element: HTMLDivElement;
+  // 読み上げ用。文字送りの途中を何度も読まないよう、セリフ全文を 1 回だけ入れる（見た目には出さない）
+  private readonly liveRegion: HTMLDivElement;
   private chars: string[] = [];
   private revealAt: number[] = [];
   private startedAt = 0;
@@ -16,9 +18,12 @@ export class SpeechBubble {
   constructor(parent: HTMLElement) {
     this.element = document.createElement('div');
     this.element.className = 'speech-bubble';
-    this.element.setAttribute('role', 'status');
-    this.element.setAttribute('aria-live', 'polite');
-    parent.append(this.element);
+    this.element.setAttribute('aria-hidden', 'true');
+    this.liveRegion = document.createElement('div');
+    this.liveRegion.className = 'visually-hidden';
+    this.liveRegion.setAttribute('role', 'status');
+    this.liveRegion.setAttribute('aria-live', 'polite');
+    parent.append(this.element, this.liveRegion);
   }
 
   /** セリフを出し始める。revealAt は各文字が現れる時刻（秒）。 */
@@ -30,6 +35,7 @@ export class SpeechBubble {
     this.visible = true;
     this.element.textContent = '';
     this.element.classList.add('visible');
+    this.liveRegion.textContent = text;
   }
 
   /** 毎フレーム呼ぶ。x・y は吹き出しの下端中央を置く画面座標（CSS px）。onScreen が false なら隠す。 */
@@ -55,5 +61,6 @@ export class SpeechBubble {
 
   dispose(): void {
     this.element.remove();
+    this.liveRegion.remove();
   }
 }
