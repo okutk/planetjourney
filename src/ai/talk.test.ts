@@ -46,6 +46,18 @@ describe('TalkDirector', () => {
     expect(director.greet(4)?.ruleId).toBe('greet.first');
   });
 
+  it('星図を開くと最初は案内をし、ワープでは行き先の名前を入れて話す', () => {
+    const director = new TalkDirector(new DialogueSelector(rules, createRandom(1)), () => 0.2);
+    director.enterShip();
+    expect(director.openedStarMap(0)?.ruleId).toBe('starmap.first');
+    const warp = director.warp(10, 'はじまりの星');
+    expect(warp?.ruleId).toBe('warp.first');
+    expect(warp?.text).toContain('はじまりの星');
+    expect(director.facts.warps).toBe(1);
+    expect(director.openedStarMap(20)?.ruleId).toBe('starmap.default');
+    expect(director.warp(30, 'はじまりの星')?.ruleId).toBe('warp.default');
+  });
+
   it('打ち切ると、話している途中でも次のセリフを話せる', () => {
     const director = createDirector();
     director.enterPlanet('はじまりの星', 2);

@@ -7,11 +7,11 @@ export type Place = 'ship' | 'planet';
  */
 export class Journey {
   place: Place = 'ship';
-  /** いまいる星（船にいるときは、最後に降りた星。まだどこにも降りていなければ null） */
+  /** いまいる星の id（船にいるときは、最後に降りた星。まだどこにも降りていなければ null） */
   planet: string | null = null;
   private readonly landings = new Map<string, number>();
 
-  /** 星に降りる。その星に降りた回数（初めてなら 1）を返す。 */
+  /** 星（id）に降りる。その星に降りた回数（初めてなら 1）を返す。 */
   land(planet: string): number {
     const count = this.visits(planet) + 1;
     this.landings.set(planet, count);
@@ -25,7 +25,7 @@ export class Journey {
     this.place = 'ship';
   }
 
-  /** その星に降りた回数。 */
+  /** その星（id）に降りた回数。 */
   visits(planet: string): number {
     return this.landings.get(planet) ?? 0;
   }
