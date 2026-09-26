@@ -17,7 +17,7 @@ import {
   WebGLRenderer,
 } from 'three';
 import { DialogueSelector, parseRules } from './ai/dialogue';
-import { Emotion, emotionVoice, moodFace, parseEmotionRules, walkPace } from './ai/emotion';
+import { Emotion, emotionalStride, emotionVoice, moodFace, parseEmotionRules } from './ai/emotion';
 import { TalkDirector } from './ai/talk';
 import { pipopaTimeline, DEFAULT_PIPOPA_CONFIG } from './audio/pipopa';
 import { VoicePlayer } from './audio/voicePlayer';
@@ -515,8 +515,8 @@ renderer.setAnimationLoop((time) => {
   // ミラ: 仕掛けの作業中は仕掛けへ歩いていき、そうでなければプレイヤーについていく
   if (!stage.update(dt)) followIntent(miraWalker, walker, DEFAULT_FOLLOW_CONFIG, miraIntent);
   if (miraIntent.amount > 0) miraWalker.faceTowards(miraIntent.direction, TURN_SPEED * dt);
-  // 感情で足取りが変わる（喜んでいると軽く、沈んでいると遅い）
-  miraInput.forward = miraIntent.amount * walkPace(emotion.values);
+  // 感情で足取りが変わる（喜んでいると軽く、沈んでいると遅い）。全力で追いかけるときは変えない
+  miraInput.forward = emotionalStride(miraIntent.amount, emotion.values);
   miraWalker.step(miraInput, dt);
   // 投影範囲。消え切った瞬間に、腕輪のそば（定位置）へ映し直す
   if (projector.update(walker.position.distanceTo(miraWalker.position), dt)) {

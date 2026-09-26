@@ -1,5 +1,6 @@
 {
   "baseline": { "joy": 40, "curiosity": 50, "anxiety": 20, "trust": 20 },
+  "ignoredAfter": 45,
   "halfLife": { "joy": 60, "curiosity": 45, "anxiety": 40, "trust": null },
   "events": {
     "discover": { "curiosity": 30, "joy": 10, "anxiety": 5, "trust": 2 },

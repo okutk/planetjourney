@@ -3,8 +3,6 @@ import type { Emotion } from './emotion';
 
 /** 話し終えてから、次に話し始めるまでの最低限の間（秒） */
 const MIN_GAP = 1.5;
-/** これだけ放っておかれると、さみしくなる（感情の ignored）秒数 */
-const IGNORED_SECONDS = 45;
 
 /**
  * ゲームの出来事から事実（facts）を集め、いつミラが話すかを決める。描画や DOM には依存しない。
@@ -108,7 +106,8 @@ export class TalkDirector {
     this.facts.idleSeconds = after;
     // セリフの条件は秒単位なので、判定は 1 秒に 1 回で十分（毎フレーム候補の配列を作らない）
     if (moving || Math.floor(after) === Math.floor(before)) return null;
-    if (before < IGNORED_SECONDS && after >= IGNORED_SECONDS) this.emotion?.feel('ignored');
+    const ignoredAfter = this.emotion?.rules.ignoredAfter ?? Infinity;
+    if (before < ignoredAfter && after >= ignoredAfter) this.emotion?.feel('ignored');
     return this.say('idle', now);
   }
 

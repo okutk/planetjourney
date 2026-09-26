@@ -30,6 +30,8 @@ export interface EmotionRules {
   baseline: EmotionValues;
   /** 平常値との差が半分になるまでの秒数。null なら戻らない（信頼は積み重なるもの） */
   halfLife: Record<EmotionName, number | null>;
+  /** これだけの秒数放っておかれると、さみしくなる（出来事 ignored） */
+  ignoredAfter: number;
   /** 出来事ごとの増減 */
   events: Record<EmotionEvent, Partial<EmotionValues>>;
 }
@@ -57,6 +59,8 @@ export function parseEmotionRules(data: unknown): EmotionRules {
     const half = halfLife[name];
     if (half !== null && !(typeof half === 'number' && half > 0)) throw new Error(`halfLife.${name} は正の数か null`);
   }
+  const { ignoredAfter } = raw as { ignoredAfter?: unknown };
+  if (!(typeof ignoredAfter === 'number' && ignoredAfter > 0)) throw new Error('ignoredAfter は正の数');
   for (const key of Object.keys(events)) {
     if (!(EMOTION_EVENTS as readonly string[]).includes(key)) throw new Error(`知らない出来事 ${key}`);
   }
@@ -85,7 +89,7 @@ export class Emotion {
   readonly values: EmotionValues;
   private readonly rates: Record<EmotionName, number>;
 
-  constructor(private readonly rules: EmotionRules) {
+  constructor(readonly rules: EmotionRules) {
     this.values = { ...rules.baseline };
     this.rates = { joy: 0, curiosity: 0, anxiety: 0, trust: 0 };
     for (const name of EMOTION_NAMES) {
@@ -179,6 +183,15 @@ export function moodFace(values: EmotionValues, out: MoodFace): MoodFace {
 /** 感情による歩く速さの倍率（0.75〜1）。喜びや好奇心が高いと足取りが軽く、沈んでいると遅い */
 export function walkPace(values: EmotionValues): number {
   return clamp(0.85 + (0.2 * (values.joy - 40)) / 60 + (0.1 * (values.curiosity - 50)) / 50, 0.75, 1);
+}
+
+/**
+ * 追従の歩く量（0〜1）に感情を反映する。定位置の近くをぶらつくときほど感情の倍率が効き、
+ * 全力で追いかけるとき（amount が 1）は倍率を掛けない（沈んで遅くなり、また置いていかれるのを防ぐ）。
+ */
+export function emotionalStride(amount: number, values: EmotionValues): number {
+  const pace = walkPace(values);
+  return amount * (pace + (1 - pace) * amount);
 }
 
 /**

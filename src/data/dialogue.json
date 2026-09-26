@@ -619,7 +619,7 @@
       {
         "fact": "idleSeconds",
         "op": "gte",
-        "value": 20
+        "value": 10
       },
       {
         "fact": "mood",
@@ -629,7 +629,7 @@
       {
         "fact": "anxiety",
         "op": "gte",
-        "value": 50
+        "value": 40
       }
     ],
     "lines": [

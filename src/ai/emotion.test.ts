@@ -5,6 +5,7 @@ import {
   EMOTION_EVENTS,
   EMOTION_NAMES,
   Emotion,
+  emotionalStride,
   emotionVoice,
   moodFace,
   parseEmotionRules,
@@ -31,6 +32,7 @@ describe('parseEmotionRules', () => {
     );
     expect(() => parseEmotionRules({ ...base, baseline: { ...base.baseline, joy: 120 } })).toThrow('joy');
     expect(() => parseEmotionRules({ ...base, halfLife: { ...base.halfLife, anxiety: 0 } })).toThrow('anxiety');
+    expect(() => parseEmotionRules({ ...base, ignoredAfter: -1 })).toThrow('ignoredAfter');
     const { jump: _jump, ...withoutJump } = base.events;
     expect(() => parseEmotionRules({ ...base, events: withoutJump })).toThrow('jump');
   });
@@ -122,6 +124,21 @@ describe('感情の反映', () => {
     expect(walkPace(values({ joy: 5 }))).toBeLessThan(walkPace(values()));
     expect(walkPace({ joy: 100, curiosity: 100, anxiety: 0, trust: 0 })).toBe(1);
     expect(walkPace({ joy: 0, curiosity: 0, anxiety: 0, trust: 0 })).toBe(0.75);
+  });
+
+  it('追従の歩く量は、近くでは感情で遅くなるが、全力で追いかけるときは変わらない', () => {
+    const low = { joy: 0, curiosity: 0, anxiety: 0, trust: 0 };
+    expect(emotionalStride(1, low)).toBe(1);
+    expect(emotionalStride(0, low)).toBe(0);
+    expect(emotionalStride(0.3, low)).toBeLessThan(0.3);
+    expect(emotionalStride(0.3, values({ joy: 100, curiosity: 100 }))).toBeCloseTo(0.3);
+    // 歩く量が増えるほど、足取りも単調に増える
+    let previous = 0;
+    for (let a = 0.05; a <= 1; a += 0.05) {
+      const stride = emotionalStride(a, low);
+      expect(stride).toBeGreaterThan(previous);
+      previous = stride;
+    }
   });
 
   it('声は平常ならもとの設定のまま、喜びで高く速く、不安で遅く間が長い', () => {

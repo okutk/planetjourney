@@ -183,7 +183,7 @@ describe('TalkDirector', () => {
     const joyBefore = emotion.values.joy;
     let said = null;
     for (let t = 0; t < 46; t += 0.5) said = said ?? director.update(0.5, false, 100 + t);
-    for (let t = 0; t < 26; t += 0.5) director.update(0.5, false, 200 + t);
+    for (let t = 0; t < 40; t += 0.5) director.update(0.5, false, 200 + t);
     expect(said?.ruleId).toBe('idle.anxious');
     expect(emotion.values.joy).toBeLessThan(joyBefore);
   });
