@@ -20,9 +20,15 @@ import { DialogueSelector, parseRules } from './ai/dialogue';
 import { nextPlayLog } from './ai/clock';
 import { Emotion, emotionalStride, emotionVoice, moodFace, parseEmotionRules } from './ai/emotion';
 import { Codex, parseCodex } from './ai/codex';
+import {
+  collectSouvenir,
+  parseSouvenirRules,
+  parseSouvenirs,
+  type PlacedSouvenir,
+} from './ai/souvenir';
 import { DIARY_LIMIT, expand, parseDiaryGrammar, writeDiary, type DiaryEntry } from './ai/diary';
 import { MemoryBook, parseMemoryRules } from './ai/memory';
-import { TalkDirector } from './ai/talk';
+import { TalkDirector, type SouvenirTopic } from './ai/talk';
 import { pipopaTimeline, DEFAULT_PIPOPA_CONFIG } from './audio/pipopa';
 import { VoicePlayer } from './audio/voicePlayer';
 import { createRandom } from './core/noise';
@@ -30,6 +36,7 @@ import dialogueData from './data/dialogue.json';
 import memoryData from './data/memory.json';
 import codexData from './data/codex.json';
 import diaryData from './data/diary.json';
+import souvenirData from './data/souvenirs.json';
 import emotionData from './data/emotion.json';
 import { SpeechBubble } from './ui/speechBubble';
 import { BehaviorSelector, Curiosity, type Behavior, type Perception } from './ai/behavior';
@@ -66,6 +73,7 @@ import { GimmickView, PICKUP_RADIUS } from './world/gimmickView';
 import { LandingPod } from './world/landingPod';
 import { PlanetView } from './world/planet';
 import { SHIP_ROOM, ShipRoomView } from './world/shipRoom';
+import { SouvenirView } from './world/souvenirView';
 import { WarpStreaks } from './world/warpStreaks';
 
 // M3: 船の部屋（拠点）と 3 つの星を行き来する。星の定義（地形・見た目・出現位置）は src/data/planets.json。
@@ -119,6 +127,9 @@ const SPAWN_HEADING = new Vector3(0, 0, 1); // 降りたときに向く方向（
 const shipRoom = new ShipRoomView();
 shipRoom.group.position.copy(SHIP_POSITION);
 scene.add(shipRoom.group);
+// おみやげ（src/data/souvenirs.json）。星ごとに 1 つ持ち帰り、ミラが決めた置き場所に飾る（部屋の座標で置く）
+const souvenirView = new SouvenirView();
+shipRoom.group.add(souvenirView.group);
 
 // プレイヤー（仮の見た目）。足元が原点、+Z が正面。向きが分かるよう正面に目印を付ける
 const player = new Group();
@@ -183,6 +194,26 @@ function writeDiaryPage(): void {
   if (diary.length > DIARY_LIMIT) diary.splice(0, diary.length - DIARY_LIMIT);
   talk.facts.diaryNew = true; // 帰ってきたあいさつで、日記を書いたことを話す
 }
+const souvenirRules = parseSouvenirRules(souvenirData);
+const souvenirs: PlacedSouvenir[] = parseSouvenirs(loaded?.souvenirs, souvenirRules);
+const souvenirTopics: SouvenirTopic[] = [];
+/** 持ち帰ったおみやげを飾り、話題に加える（起動時と、持ち帰ったとき） */
+function showSouvenir(placed: PlacedSouvenir): void {
+  const def = souvenirRules.souvenirs.find((s) => s.id === placed.id);
+  if (!def) return;
+  const slot = souvenirRules.slots.find((s) => s.id === placed.slot);
+  if (slot) souvenirView.place(def, slot);
+  souvenirTopics.push({ id: def.id, name: def.name, planet: placeName(def.planet) });
+}
+for (const placed of souvenirs) showSouvenir(placed);
+talk.setSouvenirChat(souvenirTopics, souvenirRules.chatAfter, talkRandom);
+/** 星から船へ戻るときに、その星のおみやげをまだ持っていなければ持ち帰る（talk.enterShip() の前に呼ぶ） */
+function bringSouvenir(): void {
+  const brought = collectSouvenir(String(talk.facts.planetId), souvenirRules, souvenirs, Date.now());
+  if (!brought) return;
+  showSouvenir(souvenirs[souvenirs.length - 1]);
+  talk.broughtSouvenir(brought.souvenir.name, brought.slot?.name ?? null);
+}
 
 const journey = new Journey();
 if (loaded) {
@@ -203,6 +234,7 @@ function saveGame(): void {
     playLog,
     memory: memory.toJSON(),
     diary,
+    souvenirs,
   };
   localStore.save(SAVE_KEY, data);
 }
@@ -332,7 +364,10 @@ const shipStage: Stage = {
     shipRoom.group.visible = true;
     journey.board();
     // 星から戻ってきたら、その星での出来事から日記を書く（旅の始まりは書かない）
-    if (talk.facts.place === 'planet') writeDiaryPage();
+    if (talk.facts.place === 'planet') {
+      writeDiaryPage();
+      bringSouvenir();
+    }
     saveGame();
     talk.enterShip();
     // 窓（-Z 側）の方を向いて、部屋の奥に立つ

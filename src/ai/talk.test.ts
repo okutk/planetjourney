@@ -407,5 +407,22 @@ describe('TalkDirector', () => {
       expect(director.diaryFacts(0)).toMatchObject({ firstVisit: false, jumps: 0, leftBehind: 0 });
     });
   });
+
+  it('おみやげを持ち帰ると帰りのあいさつで置き場所を言い、船でしばらく放っておかれると、おみやげの話をする', () => {
+    const director = new TalkDirector(new DialogueSelector(rules, createRandom(1)), () => 2);
+    director.enterPlanet('origin', 'はじまりの星', 1);
+    director.broughtSouvenir('つるつるの小石', '星図の台のすみ');
+    director.enterShip();
+    const back = director.greet(0);
+    expect(back?.ruleId).toBe('board.souvenir');
+    expect(back?.text).toContain('星図の台のすみ');
+    expect(director.facts.souvenirNew).toBeUndefined();
+
+    director.setSouvenirChat([{ id: 'origin.pebble', name: 'つるつるの小石', planet: 'はじまりの星' }], 15, () => 0);
+    let said = null;
+    for (let t = 0; t < 16 && !said?.ruleId.startsWith('souvenir.'); t += 0.5) said = director.update(0.5, false, 10 + t);
+    expect(said?.ruleId).toBe('souvenir.pebble');
+    expect(said?.text).toContain('はじまりの星');
+  });
 });
 

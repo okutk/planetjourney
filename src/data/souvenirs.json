@@ -1,0 +1,15 @@
+{
+  "chatAfter": 15,
+  "slots": [
+    { "id": "sill-left", "name": "窓辺", "position": [-1.1, 0.72, -2.85], "tags": ["light", "window"] },
+    { "id": "sill-right", "name": "窓辺の右はし", "position": [1.1, 0.72, -2.85], "tags": ["light", "window"] },
+    { "id": "console", "name": "星図の台のすみ", "position": [0.62, 0.96, -1.72], "tags": ["near", "map"] },
+    { "id": "projector", "name": "投影機のとなり", "position": [2.2, 1.34, 0.95], "tags": ["near", "high"] },
+    { "id": "corner", "name": "部屋のすみ", "position": [-2.7, 0.08, 2.7], "tags": ["quiet"] }
+  ],
+  "souvenirs": [
+    { "id": "origin.pebble", "planet": "origin", "name": "つるつるの小石", "shape": "stone", "color": "#b8c4a8", "prefers": ["near", "map"] },
+    { "id": "crystal.shard", "planet": "crystal", "name": "小さな結晶", "shape": "crystal", "color": "#dcccff", "prefers": ["light", "window"] },
+    { "id": "ocean.shell", "planet": "ocean", "name": "浮島の貝殻", "shape": "shell", "color": "#ffd9e0", "prefers": ["window", "quiet"] }
+  ]
+}

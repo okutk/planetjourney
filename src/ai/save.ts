@@ -3,6 +3,7 @@ import { parsePlayLog, type PlayLog } from './clock';
 import { parseDiary, type DiaryEntry } from './diary';
 import { parseEmotionValues, type EmotionValues } from './emotion';
 import { parseMemory, type MemoryData } from './memory';
+import type { PlacedSouvenir } from './souvenir';
 
 /**
  * セーブデータ。旅の進み（Journey）・ミラの感情・記憶・日記・前回のプレイ日時をひとつのプレーンなオブジェクトにまとめる。
@@ -23,6 +24,11 @@ export interface SaveData {
   memory: MemoryData;
   /** ミラの日記（古い順）。日記を足す前の保存は空。壊れたページだけ捨てる */
   diary: DiaryEntry[];
+  /**
+   * 持ち帰ったおみやげ。中身の検査には src/data/souvenirs.json の定義が要るので、ここでは配列かどうかだけ確かめ、
+   * 読み込む側（parseSouvenirs）で定義と照らし合わせる。日記やおみやげを足す前の保存は空
+   */
+  souvenirs: PlacedSouvenir[];
 }
 
 /**
@@ -31,7 +37,7 @@ export interface SaveData {
  */
 export function parseSaveData(data: unknown): SaveData | null {
   if (typeof data !== 'object' || data === null) return null;
-  const { version, journey, emotion, playLog, memory, diary } = data as Record<string, unknown>;
+  const { version, journey, emotion, playLog, memory, diary, souvenirs } = data as Record<string, unknown>;
   if (version !== SAVE_VERSION) return null;
   const parsedJourney = parseJourneySave(journey);
   if (!parsedJourney) return null;
@@ -42,5 +48,6 @@ export function parseSaveData(data: unknown): SaveData | null {
     playLog: parsePlayLog(playLog),
     memory: parseMemory(memory),
     diary: parseDiary(diary),
+    souvenirs: Array.isArray(souvenirs) ? (souvenirs as PlacedSouvenir[]) : [],
   };
 }

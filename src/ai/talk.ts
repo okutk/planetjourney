@@ -16,6 +16,13 @@ export interface MemoryLink {
   codex?: Codex;
 }
 
+/** おみやげの話の話題（おみやげの id・名前・持ち帰った星の名前） */
+export interface SouvenirTopic {
+  id: string;
+  name: string;
+  planet: string;
+}
+
 /** 話し終えてから、次に話し始めるまでの最低限の間（秒） */
 const MIN_GAP = 1.5;
 
@@ -30,6 +37,8 @@ export class TalkDirector {
   private busyUntil = -Infinity;
   /** いまいる星の訪問で起きたこと（日記の材料） */
   private readonly visit = new VisitLog();
+  /** 船の部屋でおみやげの話をするための設定（setSouvenirChat） */
+  private souvenirChat: { topics: readonly SouvenirTopic[]; after: number; random: () => number } | null = null;
 
   constructor(
     private readonly selector: DialogueSelector,
@@ -211,7 +220,23 @@ export class TalkDirector {
 
   /** いまいる場所のあいさつ（星なら greet、船なら board）。 */
   greet(now: number): DialogueLine | null {
-    return this.say(this.facts.place === 'ship' ? 'board' : 'greet', now);
+    const line = this.say(this.facts.place === 'ship' ? 'board' : 'greet', now);
+    // 持ち帰ったおみやげの話は、帰ってきたあいさつの 1 回だけ
+    delete this.facts.souvenirNew;
+    delete this.facts.souvenirSlot;
+    return line;
+  }
+
+  /** 星からおみやげを持ち帰ったとき（帰ってきたあいさつの前）。slot は置き場所の名前（置けなければ null） */
+  broughtSouvenir(name: string, slot: string | null): void {
+    this.facts.souvenirNew = name;
+    if (slot === null) delete this.facts.souvenirSlot;
+    else this.facts.souvenirSlot = slot;
+  }
+
+  /** 船の部屋で after 秒放っておかれたら、topics（持ち帰ったおみやげ）の 1 つについて話す */
+  setSouvenirChat(topics: readonly SouvenirTopic[], after: number, random: () => number): void {
+    this.souvenirChat = { topics, after, random };
   }
 
   /** 星図を開いたとき。 */
@@ -247,6 +272,15 @@ export class TalkDirector {
     if (moving || Math.floor(after) === Math.floor(before)) return null;
     const ignoredAfter = this.emotion?.rules.ignoredAfter ?? Infinity;
     if (before < ignoredAfter && after >= ignoredAfter) this.emotion?.feel('ignored');
+    const chat = this.souvenirChat;
+    if (chat && this.facts.place === 'ship' && before < chat.after && after >= chat.after && chat.topics.length > 0) {
+      const topic = chat.topics[Math.floor(chat.random() * chat.topics.length)];
+      this.facts.souvenirId = topic.id;
+      this.facts.souvenirName = topic.name;
+      this.facts.souvenirPlanet = topic.planet;
+      const line = this.say('souvenir', now);
+      if (line) return line;
+    }
     const reminisceAfter = this.memory?.reminisceAfter ?? Infinity;
     if (before < reminisceAfter && after >= reminisceAfter) {
       const line = this.reminisce(now);

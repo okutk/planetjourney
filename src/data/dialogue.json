@@ -348,6 +348,57 @@
     "cooldown": 600
   },
   {
+    "id": "board.souvenir",
+    "concept": "board",
+    "criteria": [
+      {
+        "fact": "place",
+        "op": "eq",
+        "value": "ship"
+      },
+      {
+        "fact": "planet",
+        "op": "exists"
+      },
+      {
+        "fact": "souvenirNew",
+        "op": "exists"
+      },
+      {
+        "fact": "souvenirSlot",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "おかえり。{planet}から、{souvenirNew}を持って帰ってきたよ。{souvenirSlot}に置くね。",
+      "{souvenirNew}、どこに置こうかな……。{souvenirSlot}がいい。ここなら毎日見える。"
+    ],
+    "expression": "happy"
+  },
+  {
+    "id": "board.souvenir.noslot",
+    "concept": "board",
+    "criteria": [
+      {
+        "fact": "place",
+        "op": "eq",
+        "value": "ship"
+      },
+      {
+        "fact": "planet",
+        "op": "exists"
+      },
+      {
+        "fact": "souvenirNew",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "{souvenirNew}も持って帰ってきた。……置く場所、もうないね。しまっておく。"
+    ],
+    "expression": "relaxed"
+  },
+  {
     "id": "board.relieved",
     "concept": "board",
     "criteria": [
@@ -1343,5 +1394,84 @@
       "データにない発見！「{codexTitle}」、図鑑の特別なところに書くね！"
     ],
     "expression": "surprised"
+  },
+  {
+    "id": "souvenir.default",
+    "concept": "souvenir",
+    "criteria": [
+      {
+        "fact": "souvenirName",
+        "op": "exists"
+      },
+      {
+        "fact": "souvenirPlanet",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "{souvenirName}を見てると、{souvenirPlanet}のこと、思い出す。"
+    ],
+    "expression": "relaxed",
+    "cooldown": 300
+  },
+  {
+    "id": "souvenir.pebble",
+    "concept": "souvenir",
+    "criteria": [
+      {
+        "fact": "souvenirId",
+        "op": "eq",
+        "value": "origin.pebble"
+      },
+      {
+        "fact": "souvenirPlanet",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "この小石、{souvenirPlanet}で拾ったんだよね。……持てないけど、持ってるつもり。"
+    ],
+    "expression": "happy",
+    "cooldown": 300
+  },
+  {
+    "id": "souvenir.shard",
+    "concept": "souvenir",
+    "criteria": [
+      {
+        "fact": "souvenirId",
+        "op": "eq",
+        "value": "crystal.shard"
+      },
+      {
+        "fact": "souvenirPlanet",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "窓の光が結晶に入ると、{souvenirPlanet}みたいにきらきらする。"
+    ],
+    "expression": "happy",
+    "cooldown": 300
+  },
+  {
+    "id": "souvenir.shell",
+    "concept": "souvenir",
+    "criteria": [
+      {
+        "fact": "souvenirId",
+        "op": "eq",
+        "value": "ocean.shell"
+      },
+      {
+        "fact": "souvenirPlanet",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "貝殻を耳に当てると、海の音がするんだって。……わたしには、耳がないけど。"
+    ],
+    "expression": "relaxed",
+    "cooldown": 300
   }
 ]
