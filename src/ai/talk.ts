@@ -1,6 +1,19 @@
 import { visitFacts, writeClockFacts, type PlayLog } from './clock';
 import type { DialogueLine, DialogueSelector, FactValue } from './dialogue';
 import type { Emotion } from './emotion';
+import type { Codex } from './codex';
+import type { MemoryBook } from './memory';
+
+/** 記憶とのつなぎ。現実の時刻（ミリ秒）・場所の表示名・乱数は外から渡す（テストで決められるように） */
+export interface MemoryLink {
+  book: MemoryBook;
+  reminisceAfter: number;
+  nowMs(): number;
+  nameOf(place: string): string;
+  random(): number;
+  /** 図鑑。記憶が増えるたびに、体験に変わった項目がないか確かめる */
+  codex?: Codex;
+}
 
 /** 話し終えてから、次に話し始めるまでの最低限の間（秒） */
 const MIN_GAP = 1.5;
@@ -20,6 +33,7 @@ export class TalkDirector {
     /** セリフを話し終えるまでの秒数（文字送り・音の長さに合わせる） */
     private readonly durationOf: (text: string) => number,
     private readonly emotion: Emotion | null = null,
+    private readonly memory: MemoryLink | null = null,
   ) {
     emotion?.writeFacts(this.facts);
   }
@@ -70,6 +84,49 @@ export class TalkDirector {
     this.facts.visits = visits;
     this.facts.idleSeconds = 0;
     this.emotion?.feel(visits === 1 ? 'discover' : 'arrive');
+    // ここで前に起きたこと（here_〇〇）を入れてから、降りたことを覚える
+    this.memory?.book.writePlaceFacts(planetId, this.facts);
+    this.remember('landed');
+  }
+
+  /** いまいる場所の id（船なら 'ship'） */
+  private get placeId(): string {
+    return this.facts.place === 'planet' ? String(this.facts.planetId) : 'ship';
+  }
+
+  /** いまいる場所で起きた出来事を覚える */
+  private remember(kind: string, detail?: string): void {
+    if (!this.memory) return;
+    this.memory.book.record(kind, this.placeId, this.memory.nowMs(), detail);
+    this.memory.codex?.check();
+  }
+
+  /** ミラが気になる物（name）を見終えたとき。見たことを覚える（図鑑の「見る」体験になる） */
+  inspected(name: string): void {
+    this.remember(`inspect/${name}`);
+  }
+
+  /**
+   * 図鑑の項目が新しく体験に変わっていたら、そのことを話す（話している途中なら待つ）。毎フレーム呼んでよい。
+   * 事実 codexTitle に項目名、codexRare にデータにない発見かを入れる。
+   */
+  announceDiscovery(now: number): DialogueLine | null {
+    const codex = this.memory?.codex;
+    if (!codex || now < this.busyUntil + MIN_GAP) return null;
+    // 話せたときだけ順番待ちから外す（話せなければ、次の機会にまた話す）
+    const entry = codex.peek();
+    if (!entry) return null;
+    this.facts.codexTitle = entry.title;
+    this.facts.codexRare = entry.rare === true;
+    const line = this.say('codex', now);
+    if (line) codex.next();
+    return line;
+  }
+
+  /** プレイヤーが離れすぎて、ミラが映し直されたとき（置いていかれた） */
+  leftBehind(): void {
+    this.emotion?.feel('leftBehind');
+    this.remember('leftBehind');
   }
 
   /** 仕掛けをミラに頼んだとき。task は仕掛けの種類、target は表示名（セリフの {target} に入る）。 */
@@ -89,6 +146,7 @@ export class TalkDirector {
     const key = `${String(this.facts.task)}Done`;
     this.facts[key] = ((this.facts[key] as number | undefined) ?? 0) + 1;
     this.emotion?.feel('solve'); // いっしょに解けたのがうれしい
+    this.remember('solve', String(this.facts.target));
     this.interrupt();
     return this.say('taskDone', now);
   }
@@ -128,6 +186,7 @@ export class TalkDirector {
    */
   behave(now: number, behavior: string, spot?: string): DialogueLine | null {
     this.facts.behavior = behavior;
+    if (behavior === 'sit') this.remember('sit');
     if (spot === undefined) delete this.facts.spot;
     else this.facts.spot = spot;
     return behavior === 'follow' ? null : this.say(behavior, now);
@@ -139,6 +198,7 @@ export class TalkDirector {
     if (this.facts.place === 'planet') this.emotion?.feel('home');
     this.facts.place = 'ship';
     this.facts.idleSeconds = 0;
+    this.memory?.book.writePlaceFacts('ship', this.facts);
   }
 
   /** いまいる場所のあいさつ（星なら greet、船なら board）。 */
@@ -165,6 +225,7 @@ export class TalkDirector {
     this.facts.jumps = (this.facts.jumps as number) + 1;
     this.facts.idleSeconds = 0; // 跳んでいるのは遊んでいるということなので、放置の時間は数え直す
     this.emotion?.feel('jump');
+    this.remember('jump');
     return this.say('jump', now);
   }
 
@@ -177,7 +238,22 @@ export class TalkDirector {
     if (moving || Math.floor(after) === Math.floor(before)) return null;
     const ignoredAfter = this.emotion?.rules.ignoredAfter ?? Infinity;
     if (before < ignoredAfter && after >= ignoredAfter) this.emotion?.feel('ignored');
+    const reminisceAfter = this.memory?.reminisceAfter ?? Infinity;
+    if (before < reminisceAfter && after >= reminisceAfter) {
+      const line = this.reminisce(now);
+      if (line) return line;
+    }
     return this.say('idle', now);
+  }
+
+  /** 思い出話をする（話せる思い出がなければ null） */
+  private reminisce(now: number): DialogueLine | null {
+    if (!this.memory || now < this.busyUntil + MIN_GAP) return null;
+    const { book } = this.memory;
+    const entry = book.pick(this.placeId, now, this.memory.nowMs(), this.memory.random);
+    if (!entry) return null;
+    book.writeMemoryFacts(entry, this.memory.nowMs(), this.memory.nameOf, this.facts);
+    return this.say('reminisce', now);
   }
 
   /** 話している途中のセリフを打ち切る（場所を移るとき）。すぐ次のセリフを話せるようになる。 */

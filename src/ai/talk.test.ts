@@ -4,6 +4,10 @@ import dialogueData from '../data/dialogue.json';
 import emotionData from '../data/emotion.json';
 import { DialogueSelector, parseRules } from './dialogue';
 import { Emotion, parseEmotionRules } from './emotion';
+import memoryData from '../data/memory.json';
+import { MemoryBook, parseMemoryRules } from './memory';
+import codexData from '../data/codex.json';
+import { Codex, parseCodex } from './codex';
 import { TalkDirector } from './talk';
 
 const rules = parseRules(dialogueData);
@@ -308,6 +312,85 @@ describe('TalkDirector', () => {
     expect(director.behave(120, 'sit')?.ruleId.startsWith('sit.')).toBe(true);
     expect(director.facts.spot).toBeUndefined();
     expect(director.behave(130, 'hide')?.ruleId).toBe('hide.default');
+  });
+
+  describe('記憶', () => {
+    const memoryRules = parseMemoryRules(memoryData);
+    function withMemory() {
+      const book = new MemoryBook(memoryRules);
+      const codex = new Codex(parseCodex(codexData), book);
+      let nowMs = Date.UTC(2026, 8, 1, 12);
+      const director = new TalkDirector(new DialogueSelector(rules, createRandom(1)), () => 2, null, {
+        book,
+        reminisceAfter: memoryRules.reminisceAfter,
+        nowMs: () => nowMs,
+        nameOf: (place) => (place === 'origin' ? 'はじまりの星' : place),
+        random: () => 0,
+        codex,
+      });
+      return { book, director, advance: (ms: number) => (nowMs += ms) };
+    }
+
+    it('出来事を場所ごとに覚える', () => {
+      const { book, director } = withMemory();
+      director.enterPlanet('origin', 'はじまりの星', 1);
+      director.jumped(0);
+      director.leftBehind();
+      director.behave(10, 'sit');
+      director.askTask(20, 'scan', '石碑');
+      director.finishTask(30, 1);
+      director.enterShip();
+      director.jumped(40);
+      expect(book.count('landed', 'origin')).toBe(1);
+      expect(book.count('jump', 'origin')).toBe(1);
+      expect(book.count('jump', 'ship')).toBe(1);
+      expect(book.count('leftBehind', 'origin')).toBe(1);
+      expect(book.count('sit', 'origin')).toBe(1);
+      expect(book.toJSON().entries.find((e) => e.kind === 'solve')?.detail).toBe('石碑');
+    });
+
+    it('前にはぐれた星に降りると、そのことに触れる', () => {
+      const { director } = withMemory();
+      director.enterPlanet('origin', 'はじまりの星', 1);
+      director.leftBehind();
+      director.enterShip();
+      director.enterPlanet('origin', 'はじまりの星', 2);
+      expect(director.facts.here_leftBehind).toBe(1);
+      expect(director.greet(100)?.ruleId).toBe('greet.remember.lost');
+      // 何度も降りるたびに同じ話を蒸し返さない（しばらくは、ふつうのあいさつ）
+      director.enterShip();
+      director.enterPlanet('origin', 'はじまりの星', 3);
+      expect(director.greet(200)?.ruleId).not.toBe('greet.remember.lost');
+    });
+
+    it('しばらく放っておかれると、思い出話をする', () => {
+      const { director, advance } = withMemory();
+      director.enterPlanet('origin', 'はじまりの星', 1);
+      director.greet(0);
+      advance(2 * 24 * 60 * 60 * 1000);
+      let said = null;
+      for (let t = 0; t < memoryRules.reminisceAfter + 1; t += 0.5) {
+        const line = director.update(0.5, false, 10 + t);
+        if (line?.ruleId.startsWith('reminisce.')) said = line;
+      }
+      expect(said?.ruleId).toBe('reminisce.landed');
+      expect(said?.text).toContain('はじまりの星');
+      expect(said?.text).toContain('2日前');
+    });
+
+    it('図鑑の項目が体験に変わったら、話せるときに話す（見た物も体験になる）', () => {
+      const { director } = withMemory();
+      director.enterShip();
+      director.greet(0);
+      director.inspected('星図の台');
+      expect(director.announceDiscovery(0.5)).toBeNull(); // 話している途中は待つ
+      const line = director.announceDiscovery(10);
+      expect(line?.ruleId).toBe('codex.default');
+      expect(line?.text).toContain('星図の台');
+      expect(director.announceDiscovery(20)).toBeNull();
+      director.enterPlanet('ocean', '海だけの星', 1);
+      expect(director.announceDiscovery(30)?.ruleId).toBe('codex.rare');
+    });
   });
 });
 

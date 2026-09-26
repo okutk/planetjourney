@@ -42,7 +42,7 @@
   {
     "id": "ocean",
     "name": "海だけの星",
-    "data": "陸地なし。浮島の群れと、空を泳ぐ巨大な影の観測記録。",
+    "data": "陸地なし。空を泳ぐ巨大な影の観測記録。",
     "available": true,
     "terrain": { "radius": 6, "amplitude": 1.2, "frequency": 1.1, "octaves": 3, "seed": 21, "seaLevel": 0.12 },
     "look": {

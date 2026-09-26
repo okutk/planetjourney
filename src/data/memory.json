@@ -1,0 +1,13 @@
+{
+  "shipName": "船",
+  "reminisceAfter": 35,
+  "repeatAfter": 600,
+  "minAge": 300,
+  "topics": {
+    "landed": { "minCount": 1 },
+    "solve": { "minCount": 1 },
+    "leftBehind": { "minCount": 1 },
+    "jump": { "minCount": 10 },
+    "sit": { "minCount": 1 }
+  }
+}

@@ -300,3 +300,77 @@ body {
   color: #e8ecff;
   font: 600 15px system-ui, sans-serif;
 }
+
+/* 図鑑。右上のボタンで開き、星図と同じ全画面の層に場所ごとの項目を並べる */
+.codex-button {
+  position: fixed;
+  top: calc(max(12px, env(safe-area-inset-top)) + 26px);
+  right: max(16px, env(safe-area-inset-right));
+  min-width: 64px;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 20px;
+  border: 2px solid rgba(159, 232, 255, 0.5);
+  background: rgba(11, 16, 38, 0.5);
+  color: #e8ecff;
+  font: 600 14px system-ui, sans-serif;
+}
+
+.codex-button[hidden] {
+  display: none;
+}
+
+.codex-summary {
+  margin: 0;
+  font-size: 13px;
+  color: #9fe8ff;
+}
+
+.codex-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  touch-action: pan-y;
+}
+
+.codex-list h3 {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 15px;
+}
+
+.codex-list section {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.codex-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 2px solid rgba(232, 236, 255, 0.2);
+  background: rgba(232, 236, 255, 0.05);
+  color: rgba(232, 236, 255, 0.55);
+  font: 13px/1.5 system-ui, sans-serif;
+}
+
+.codex-card.experienced {
+  border-color: rgba(159, 232, 255, 0.5);
+  background: rgba(159, 232, 255, 0.12);
+  color: #e8ecff;
+}
+
+.codex-card.rare {
+  border-color: rgba(255, 233, 168, 0.8);
+  background: rgba(255, 233, 168, 0.14);
+}
+
+.codex-card em {
+  font-style: normal;
+  color: #ffe9a8;
+}
