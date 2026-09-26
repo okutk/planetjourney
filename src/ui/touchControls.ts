@@ -153,7 +153,14 @@ export class TouchControls {
 
   private readonly onWheel = (event: WheelEvent): void => {
     event.preventDefault();
-    this.zoom *= Math.exp(event.deltaY * WHEEL_ZOOM_SPEED);
+    // 行単位・ページ単位で届くブラウザ（Firefox など）もあるので、ピクセルにそろえる
+    const scale =
+      event.deltaMode === WheelEvent.DOM_DELTA_LINE
+        ? 33
+        : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+          ? this.layer.clientHeight
+          : 1;
+    this.zoom *= Math.exp(event.deltaY * scale * WHEEL_ZOOM_SPEED);
   };
 
   private readonly onJumpDown = (event: PointerEvent): void => {

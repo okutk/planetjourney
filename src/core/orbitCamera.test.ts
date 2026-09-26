@@ -84,7 +84,9 @@ describe('OrbitCamera', () => {
   });
 
   it('ほぼ前へ歩くときの回り込みはゆるやか（5 秒で 60° 未満）', () => {
-    // 回り込みがいちばん強いのはコーン（25°）の半分の 12.5° 前後
+    // 回り込みがいちばん強いのはコーン（25°）の半分の 12.5° 前後。
+    // 移動はカメラ基準なので、少し斜め前に倒し続けると回り込みは止まらず、最大で約 9°/秒でゆっくり曲がる
+    // （意図した挙動。25° を超えれば止まる）
     for (const degrees of [5, 10, 12.5, 15, 20]) {
       const rad = (degrees * Math.PI) / 180;
       expect(walkWithStick(Math.sin(rad), Math.cos(rad))).toBeLessThan(Math.PI / 3);
