@@ -602,7 +602,11 @@ function updateBehavior(dt: number, walker: Walker, miraWalker: Walker): void {
       }
       const distance = seekIntent(miraWalker, spot.position, INSPECT_ARRIVE, INSPECT_SLOW, miraIntent);
       if (miraIntent.amount === 0) miraWalker.faceTowards(miraIntent.direction, TURN_SPEED * dt);
-      curiosity.update(dt, distance <= INSPECT_ARRIVE);
+      // 見終えたら一度ついていくに戻る（次の物は選び直し、また「気になる」と言ってから見に行く）
+      if (curiosity.update(dt, distance <= INSPECT_ARRIVE)) {
+        brain.reset();
+        behavior = 'follow';
+      }
       break;
     }
     case 'sit':

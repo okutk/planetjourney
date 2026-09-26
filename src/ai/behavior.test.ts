@@ -84,6 +84,15 @@ describe('BehaviorSelector', () => {
     selector.reset();
     expect(selector.current).toBe('follow');
   });
+
+  it('見終えて reset したら、次の物を見に行く前に minHold 秒はついていく', () => {
+    const selector = new BehaviorSelector();
+    const looking = perceive({ idleSeconds: 3, interestDistance: 3 });
+    expect(selector.update(DEFAULT_BEHAVIOR_CONFIG.minHold, looking)).toBe('inspect');
+    selector.reset();
+    expect(selector.update(0.1, looking)).toBe('follow');
+    expect(selector.update(DEFAULT_BEHAVIOR_CONFIG.minHold, looking)).toBe('inspect');
+  });
 });
 
 describe('Curiosity', () => {
