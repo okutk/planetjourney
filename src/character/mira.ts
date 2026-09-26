@@ -25,14 +25,16 @@ export class MiraView {
   height = PLACEHOLDER_HEIGHT;
   /** 読み込んだ VRM。仮表示のあいだは null */
   vrm: VRM | null = null;
-  private placeholder: MiraPlaceholder | null = new MiraPlaceholder();
+  private placeholder: MiraPlaceholder | null;
   private motion: MiraMotion | null = null;
   /** 差し替え用のモーション。null なら手続きのモーションを使う */
   private clips: MotionClips | null = null;
   private disposed = false;
 
   constructor() {
-    this.group.add(this.placeholder!.group);
+    const placeholder = new MiraPlaceholder();
+    this.placeholder = placeholder;
+    this.group.add(placeholder.group);
     void this.load();
   }
 
