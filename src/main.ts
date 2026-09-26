@@ -18,13 +18,14 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
-import { alignToUp, toTangent, upAt } from './core/sphere';
+import { DEFAULT_ORBIT_CAMERA_CONFIG, OrbitCamera } from './core/orbitCamera';
+import { alignToUp, upAt } from './core/sphere';
 import { DEFAULT_WALKER_CONFIG, SphericalWalker, type WalkInput } from './core/walker';
 import { TouchControls } from './ui/touchControls';
 
 // M1: 球面重力で星の上を歩き、ジャンプできるシーン。
 // 操作（移動はカメラから見た向き。プレイヤーは進む方向へ向き直る）
-//   タッチ: 左半分に仮想スティック、右半分のドラッグでカメラを回す、右下のボタンでジャンプ
+//   タッチ: 左半分に仮想スティック、右半分のドラッグでカメラを回す（上下で見下ろす角度）、右下のボタンでジャンプ
 //   キーボード（補助）: WASD で移動、Space でジャンプ
 // シーンはページと同じ寿命なので、後片付けはページの破棄（開発時はフルリロード）に任せる。
 
@@ -32,8 +33,6 @@ const PLANET_RADIUS = 5;
 const MAX_PIXEL_RATIO = 2; // スマホで描画負荷が跳ね上がらないよう上限を設ける
 const MAX_DT = 1 / 30; // タブ復帰などで dt が跳ねても地面を突き抜けないよう上限を設ける
 const TURN_SPEED = 12; // プレイヤーが進む方向へ向き直る速さ（ラジアン/秒）
-const CAMERA_DISTANCE = 7;
-const CAMERA_HEIGHT = 4;
 const CAMERA_DAMPING = 6; // 大きいほどカメラがすぐ追いつく
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
@@ -134,29 +133,21 @@ function resize(): void {
 window.addEventListener('resize', resize);
 resize();
 
-// カメラはプレイヤーの後ろ上から追う（毎フレーム new しないよう使い回す）。
-// カメラの向き（地表に沿った単位ベクトル）はプレイヤーの向きとは別に持ち、
-// プレイヤーが動いた分の回転で一緒に運ぶので、星を回り込んでもずれない
-const cameraHeading = walker.forward.clone();
+// 三人称カメラ。向きはプレイヤーと一緒に運び、歩いているとしばらくして後ろへ回り込む。
+// 実際のカメラは目標の位置へ減衰付きで追いかける（毎フレーム new しないよう使い回す）
+const orbit = new OrbitCamera(DEFAULT_ORBIT_CAMERA_CONFIG, walker.forward, walker.up);
 const cameraRight = new Vector3();
 const cameraGoal = new Vector3();
 const cameraTarget = new Vector3();
 const moveDirection = new Vector3();
-function cameraGoalFor(out: Vector3): Vector3 {
-  return out
-    .copy(walker.position)
-    .addScaledVector(walker.up, CAMERA_HEIGHT)
-    .addScaledVector(cameraHeading, -CAMERA_DISTANCE);
-}
 function updateCamera(dt: number): void {
-  cameraGoalFor(cameraGoal);
+  orbit.eye(walker.position, walker.up, cameraGoal);
   const t = 1 - Math.exp(-CAMERA_DAMPING * dt);
   camera.position.lerp(cameraGoal, t);
   camera.up.lerp(walker.up, t).normalize();
-  cameraTarget.copy(walker.position).addScaledVector(walker.up, 1);
-  camera.lookAt(cameraTarget);
+  camera.lookAt(orbit.target(walker.position, walker.up, cameraTarget));
 }
-camera.position.copy(cameraGoalFor(cameraGoal));
+camera.position.copy(orbit.eye(walker.position, walker.up, cameraGoal));
 camera.up.copy(walker.up);
 
 const input: WalkInput = { forward: 0, right: 0, jump: false };
@@ -165,8 +156,7 @@ renderer.setAnimationLoop((time) => {
   const dt = lastTime === undefined ? 0 : Math.min((time - lastTime) / 1000, MAX_DT);
   lastTime = time;
 
-  // 右へドラッグすると、カメラが右へ回り込む（上から見て時計回り）
-  cameraHeading.applyAxisAngle(walker.up, -touch.consumeYaw());
+  orbit.rotate(touch.consumeYaw(), touch.consumePitch(), walker.up);
 
   // スティック（なければキーボード）の入力を、カメラから見た地表の向きに直す
   let stickX = touch.stick.x;
@@ -176,15 +166,16 @@ renderer.setAnimationLoop((time) => {
     stickY = axis('KeyW', 'KeyS');
   }
   const amount = Math.min(1, Math.hypot(stickX, stickY));
-  cameraRight.crossVectors(cameraHeading, walker.up);
-  moveDirection.copy(cameraHeading).multiplyScalar(stickY).addScaledVector(cameraRight, stickX);
+  cameraRight.crossVectors(orbit.heading, walker.up);
+  moveDirection.copy(orbit.heading).multiplyScalar(stickY).addScaledVector(cameraRight, stickX);
   if (amount > 0) walker.faceTowards(moveDirection, TURN_SPEED * dt);
 
   input.forward = amount;
   input.jump = jumpRequested || touch.consumeJump();
   jumpRequested = false;
   walker.step(input, dt);
-  toTangent(cameraHeading.applyQuaternion(walker.lastRotation), walker.up);
+  orbit.transport(walker.lastRotation, walker.up);
+  orbit.update(dt, walker.forward, walker.up, amount > 0);
 
   player.position.copy(walker.position);
   walker.orientation(player.quaternion);
