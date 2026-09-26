@@ -1,6 +1,7 @@
 import { Box3, Group, type Object3D, Vector3 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { VRM, VRMLoaderPlugin, VRMMetaLoaderPlugin, VRMUtils, type VRMExpressionManager } from '@pixiv/three-vrm';
+import type { MoodFace } from '../ai/emotion';
 import { Blinker, ExpressionFader } from '../ai/face';
 import { Gaze } from '../ai/gaze';
 import { HologramLook } from './hologram';
@@ -41,6 +42,8 @@ export class MiraView {
   private readonly gaze = new Gaze();
   /** 見る物の位置（ワールド座標）。null なら正面を見る。毎フレーム外から入れる */
   gazeTarget: Vector3 | null = null;
+  /** 感情によるいつもの顔（表情の重み）。毎フレーム外から入れる。話すときの表情が出ているあいだは弱める */
+  readonly mood: MoodFace = { happy: 0, sad: 0, relaxed: 0 };
   /** 前のフレームに VRM へ重みを書いた表情の名前（次のフレームで 0 に戻すために覚えておく） */
   private readonly appliedExpressions: string[] = [];
   /** 差し替え用のモーション。null なら手続きのモーションを使う */
@@ -145,11 +148,18 @@ export class MiraView {
     if (!vrm) return;
     const manager = vrm.expressionManager;
     if (manager) {
+      // いつもの顔は、話すときの表情が出ている分だけ弱める
+      const talking = this.expression.strength;
+      const moodScale = 1 - talking;
+      const { happy, sad, relaxed } = this.mood;
       // 表情が出ているあいだは、まばたきで目の形が崩れないように弱める
-      manager.setValue('blink', blink * (1 - this.expression.strength));
+      manager.setValue('blink', blink * (1 - Math.min(1, talking + (happy + sad + relaxed) * moodScale)));
       // 消えた表情の重みが残らないよう、前のフレームに書いた表情はいったん 0 にする
       for (const name of this.appliedExpressions) manager.setValue(name, 0);
       this.appliedExpressions.length = 0;
+      this.applyExpression(manager, 'happy', happy * moodScale);
+      this.applyExpression(manager, 'sad', sad * moodScale);
+      this.applyExpression(manager, 'relaxed', relaxed * moodScale);
       this.applyExpression(manager, this.expression.previous, this.expression.previousWeight);
       this.applyExpression(manager, this.expression.current, this.expression.currentWeight);
     }
@@ -164,8 +174,9 @@ export class MiraView {
 
   private applyExpression(manager: VRMExpressionManager, name: string | null, weight: number): void {
     if (name === null || weight <= 0 || !manager.getExpression(name)) return;
-    manager.setValue(name, weight);
-    this.appliedExpressions.push(name);
+    // 同じ表情をいつもの顔と話すときの表情の両方で使うことがあるので、足し合わせる
+    manager.setValue(name, Math.min(1, (manager.getValue(name) ?? 0) + weight));
+    if (!this.appliedExpressions.includes(name)) this.appliedExpressions.push(name);
   }
 
   /**

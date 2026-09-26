@@ -17,11 +17,13 @@ import {
   WebGLRenderer,
 } from 'three';
 import { DialogueSelector, parseRules } from './ai/dialogue';
+import { Emotion, emotionVoice, moodFace, parseEmotionRules, walkPace } from './ai/emotion';
 import { TalkDirector } from './ai/talk';
 import { pipopaTimeline, DEFAULT_PIPOPA_CONFIG } from './audio/pipopa';
 import { VoicePlayer } from './audio/voicePlayer';
 import { createRandom } from './core/noise';
 import dialogueData from './data/dialogue.json';
+import emotionData from './data/emotion.json';
 import { SpeechBubble } from './ui/speechBubble';
 import { DEFAULT_FOLLOW_CONFIG, followIntent, followSlot, type FollowIntent } from './ai/companion';
 import { Projector } from './ai/projection';
@@ -107,13 +109,26 @@ noseGeometry.translate(0, 0.9, 0.3);
 player.add(new Mesh(noseGeometry, new MeshStandardMaterial({ color: '#40325c' })));
 scene.add(player);
 
+// ミラの感情（src/data/emotion.json）。出来事で動き、時間とともに落ち着く。表情・歩く速さ・声・セリフ選びに反映する
+const emotion = new Emotion(parseEmotionRules(emotionData));
+const voiceConfig = { ...DEFAULT_PIPOPA_CONFIG };
+/** いまの感情に合わせた声の設定（文字送りと音で同じものを使う） */
+function currentVoice(): typeof voiceConfig {
+  return emotionVoice(emotion.values, DEFAULT_PIPOPA_CONFIG, voiceConfig);
+}
+
 // ミラの会話。セリフは src/data/dialogue.json から条件で選び、吹き出しとピポパ音声で話す
 /** セリフを話し終えるまでの秒数（文字送り・音の長さに合わせる） */
 function speechDuration(text: string): number {
-  const { revealAt } = pipopaTimeline(text);
-  return (revealAt.at(-1) ?? 0) + DEFAULT_PIPOPA_CONFIG.charInterval;
+  const config = currentVoice();
+  const { revealAt } = pipopaTimeline(text, config);
+  return (revealAt.at(-1) ?? 0) + config.charInterval;
 }
-const talk = new TalkDirector(new DialogueSelector(parseRules(dialogueData), createRandom(Date.now())), speechDuration);
+const talk = new TalkDirector(
+  new DialogueSelector(parseRules(dialogueData), createRandom(Date.now())),
+  speechDuration,
+  emotion,
+);
 
 // ミラ。VRM を読み込むまでは仮の見た目。プレイヤーの斜め後ろの定位置を目指して、プレイヤーと同じ歩き方でついてくる
 const mira = new MiraView();
@@ -317,7 +332,7 @@ for (const type of ['pointerdown', 'pointerup', 'touchend', 'keydown']) {
 }
 function say(line: { text: string; expression?: string } | null, now: number): void {
   if (!line) return;
-  const { beeps, revealAt } = pipopaTimeline(line.text);
+  const { beeps, revealAt } = pipopaTimeline(line.text, currentVoice());
   voice.play(beeps);
   bubble.show(line.text, revealAt, now);
   // セリフに表情が付いていれば、話し終えるまで（＋少し）その顔をする
@@ -433,10 +448,12 @@ renderer.setAnimationLoop((time) => {
 
   followIntent(miraWalker, walker, DEFAULT_FOLLOW_CONFIG, miraIntent);
   if (miraIntent.amount > 0) miraWalker.faceTowards(miraIntent.direction, TURN_SPEED * dt);
-  miraInput.forward = miraIntent.amount;
+  // 感情で足取りが変わる（喜んでいると軽く、沈んでいると遅い）
+  miraInput.forward = miraIntent.amount * walkPace(emotion.values);
   miraWalker.step(miraInput, dt);
   // 投影範囲。消え切った瞬間に、腕輪のそば（定位置）へ映し直す
   if (projector.update(walker.position.distanceTo(miraWalker.position), dt)) {
+    emotion.feel('leftBehind'); // 置いていかれて、少し不安になる
     stage.reprojectMira();
     placeMira();
     mira.settle();
@@ -474,7 +491,9 @@ renderer.setAnimationLoop((time) => {
   placeMira();
   // ミラはプレイヤーの顔のあたりを見る（正面から離れすぎていれば前を見る）
   mira.gazeTarget = playerHead.copy(walker.position).addScaledVector(walker.up, PLAYER_EYE_HEIGHT);
-  mira.update(dt, miraIntent.amount, projector.noise, projector.visibility);
+  emotion.update(dt);
+  moodFace(emotion.values, mira.mood);
+  mira.update(dt, miraInput.forward, projector.noise, projector.visibility);
   updateCamera(walker, dt);
   renderer.render(scene, camera);
 
