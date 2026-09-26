@@ -114,8 +114,9 @@ export class SphericalWalker {
     this.up.subVectors(this.position, center).normalize();
     let height = this.position.distanceTo(center) + this.verticalSpeed * dt;
 
-    // 接地判定: 地表より下に行ったら地表に戻して着地
-    if (height <= planetRadius) {
+    // 接地判定: 地表より下に行ったら地表に戻して着地。
+    // 接地中は誤差を持ち越さないよう、毎ステップ地表の高さに固定する
+    if (this.grounded || height <= planetRadius) {
       height = planetRadius;
       this.verticalSpeed = 0;
       this.grounded = true;

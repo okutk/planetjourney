@@ -22,8 +22,11 @@ import { alignToUp, upAt } from './core/sphere';
 import { DEFAULT_WALKER_CONFIG, SphericalWalker, type WalkInput } from './core/walker';
 
 // M1: 球面重力で星の上を歩き、ジャンプできるシーン。
-// 操作は動作確認用の最小限のキーボード（W/S: 前後、A/D: 向きを変える、Space: ジャンプ）。
-// タッチ操作・三人称カメラ・地形は別のテーマで入れる。
+// 操作は動作確認用の最小限のもの。
+//   キーボード: W/S で前後、A/D で向きを変える、Space でジャンプ
+//   タッチ: 画面の左半分を押しているあいだ前進、右半分をタップでジャンプ
+// 本格的なタッチ操作（仮想スティック）・三人称カメラ・地形は別のテーマで入れる。
+// シーンはページと同じ寿命なので、後片付けはページの破棄（開発時はフルリロード）に任せる。
 
 const PLANET_RADIUS = 5;
 const MAX_PIXEL_RATIO = 2; // スマホで描画負荷が跳ね上がらないよう上限を設ける
@@ -47,25 +50,18 @@ const sun = new DirectionalLight('#fff2d6', 2.2);
 sun.position.set(8, 10, 6);
 scene.add(sun);
 
-// 後片付け用に、作ったジオメトリとマテリアルを覚えておく
-const disposables: { dispose(): void }[] = [];
-function track<T extends { dispose(): void }>(resource: T): T {
-  disposables.push(resource);
-  return resource;
-}
-
 const planetCenter = new Vector3();
 scene.add(
   new Mesh(
-    track(new IcosahedronGeometry(PLANET_RADIUS, 3)),
-    track(new MeshStandardMaterial({ color: '#7fcf8a', flatShading: true })),
+    new IcosahedronGeometry(PLANET_RADIUS, 3),
+    new MeshStandardMaterial({ color: '#7fcf8a', flatShading: true }),
   ),
 );
 
 // 地表の木。歩いたときに進んでいることが分かる目印を兼ねる
-const treeGeometry = track(new ConeGeometry(0.35, 1.2, 6));
+const treeGeometry = new ConeGeometry(0.35, 1.2, 6);
 treeGeometry.translate(0, 0.6, 0);
-const treeMaterial = track(new MeshStandardMaterial({ color: '#2f7a4b', flatShading: true }));
+const treeMaterial = new MeshStandardMaterial({ color: '#2f7a4b', flatShading: true });
 for (let i = 0; i < 24; i++) {
   const direction = new Vector3().randomDirection();
   const tree = new Mesh(treeGeometry, treeMaterial);
@@ -76,12 +72,12 @@ for (let i = 0; i < 24; i++) {
 
 // プレイヤー（仮の見た目）。足元が原点、+Z が正面。向きが分かるよう正面に目印を付ける
 const player = new Group();
-const bodyGeometry = track(new CapsuleGeometry(0.3, 0.6, 4, 8));
+const bodyGeometry = new CapsuleGeometry(0.3, 0.6, 4, 8);
 bodyGeometry.translate(0, 0.6, 0);
-player.add(new Mesh(bodyGeometry, track(new MeshStandardMaterial({ color: '#f4c7d8' }))));
-const noseGeometry = track(new BoxGeometry(0.2, 0.12, 0.2));
+player.add(new Mesh(bodyGeometry, new MeshStandardMaterial({ color: '#f4c7d8' })));
+const noseGeometry = new BoxGeometry(0.2, 0.12, 0.2);
 noseGeometry.translate(0, 0.9, 0.3);
-player.add(new Mesh(noseGeometry, track(new MeshStandardMaterial({ color: '#40325c' }))));
+player.add(new Mesh(noseGeometry, new MeshStandardMaterial({ color: '#40325c' })));
 scene.add(player);
 
 const walker = new SphericalWalker({
@@ -99,9 +95,9 @@ function createStarField(count: number, radius: number): Points {
     p.randomDirection().multiplyScalar(radius);
     positions.push(p.x, p.y, p.z);
   }
-  const geometry = track(new BufferGeometry());
+  const geometry = new BufferGeometry();
   geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
-  return new Points(geometry, track(new PointsMaterial({ color: '#ffffff', size: 0.6 })));
+  return new Points(geometry, new PointsMaterial({ color: '#ffffff', size: 0.6 }));
 }
 
 // キーボード入力（動作確認用）
@@ -119,10 +115,23 @@ function onKeyUp(event: KeyboardEvent): void {
 }
 function onBlur(): void {
   pressed.clear();
+  walkPointers.clear();
 }
 function axis(positive: string, negative: string): number {
   return (pressed.has(positive) ? 1 : 0) - (pressed.has(negative) ? 1 : 0);
 }
+// 最小限のタッチ入力（仮想スティックが入るまでのつなぎ）
+const walkPointers = new Set<number>();
+function onPointerDown(event: PointerEvent): void {
+  if (event.clientX < window.innerWidth / 2) walkPointers.add(event.pointerId);
+  else jumpRequested = true;
+}
+function onPointerUp(event: PointerEvent): void {
+  walkPointers.delete(event.pointerId);
+}
+canvas.addEventListener('pointerdown', onPointerDown);
+canvas.addEventListener('pointerup', onPointerUp);
+canvas.addEventListener('pointercancel', onPointerUp);
 window.addEventListener('keydown', onKeyDown);
 window.addEventListener('keyup', onKeyUp);
 window.addEventListener('blur', onBlur);
@@ -163,7 +172,7 @@ renderer.setAnimationLoop((time) => {
   lastTime = time;
 
   walker.turn(axis('KeyA', 'KeyD') * TURN_SPEED * dt);
-  input.forward = axis('KeyW', 'KeyS');
+  input.forward = walkPointers.size > 0 ? 1 : axis('KeyW', 'KeyS');
   input.jump = jumpRequested;
   jumpRequested = false;
   walker.step(input, dt);
@@ -172,15 +181,4 @@ renderer.setAnimationLoop((time) => {
   walker.orientation(player.quaternion);
   updateCamera(dt);
   renderer.render(scene, camera);
-});
-
-// 開発サーバーのホットリロードでシーンを作り直すときに、古いものを片付ける
-import.meta.hot?.dispose(() => {
-  renderer.setAnimationLoop(null);
-  window.removeEventListener('keydown', onKeyDown);
-  window.removeEventListener('keyup', onKeyUp);
-  window.removeEventListener('blur', onBlur);
-  window.removeEventListener('resize', resize);
-  for (const resource of disposables) resource.dispose();
-  renderer.dispose();
 });
