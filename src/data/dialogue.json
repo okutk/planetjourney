@@ -1,0 +1,171 @@
+[
+  {
+    "id": "greet.first",
+    "concept": "greet",
+    "criteria": [
+      {
+        "fact": "visits",
+        "op": "eq",
+        "value": 1
+      },
+      {
+        "fact": "planet",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "ここが、わたしの初めての地面……。データでは知ってた。でも、こんなにふかふかなんだね。"
+    ],
+    "once": true
+  },
+  {
+    "id": "greet.planet",
+    "concept": "greet",
+    "criteria": [
+      {
+        "fact": "planet",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "着いたよ。ここは{planet}。さあ、歩いてみよう！",
+      "{planet}に到着。今日は何が見つかるかな。"
+    ]
+  },
+  {
+    "id": "greet.default",
+    "concept": "greet",
+    "criteria": [],
+    "lines": [
+      "着いたよ。さあ、歩いてみよう！"
+    ]
+  },
+  {
+    "id": "jump.first",
+    "concept": "jump",
+    "criteria": [
+      {
+        "fact": "jumps",
+        "op": "eq",
+        "value": 1
+      }
+    ],
+    "lines": [
+      "わっ、跳んだ！ この星の重力なら、もっと高く跳べるはず……計算上は。"
+    ],
+    "once": true
+  },
+  {
+    "id": "jump.many",
+    "concept": "jump",
+    "criteria": [
+      {
+        "fact": "jumps",
+        "op": "gte",
+        "value": 20
+      }
+    ],
+    "lines": [
+      "そんなに跳ぶの、楽しい？ ……わたしもやってみたいな。",
+      "ぴょんぴょん。記録しておくね、跳んだ回数。"
+    ],
+    "cooldown": 60
+  },
+  {
+    "id": "jump.default",
+    "concept": "jump",
+    "criteria": [],
+    "lines": [
+      "ふわっ。",
+      "いいジャンプ！",
+      "着地、成功。"
+    ],
+    "cooldown": 8
+  },
+  {
+    "id": "lap.first",
+    "concept": "lap",
+    "criteria": [
+      {
+        "fact": "laps",
+        "op": "eq",
+        "value": 1
+      }
+    ],
+    "lines": [
+      "一周して、元の場所に戻ってきた……！ 星が丸いって、こういうことなんだね。"
+    ],
+    "once": true
+  },
+  {
+    "id": "lap.default",
+    "concept": "lap",
+    "criteria": [
+      {
+        "fact": "laps",
+        "op": "gte",
+        "value": 2
+      }
+    ],
+    "lines": [
+      "また一周。{laps}周目だよ。"
+    ],
+    "cooldown": 30
+  },
+  {
+    "id": "idle.worried",
+    "concept": "idle",
+    "criteria": [
+      {
+        "fact": "idleSeconds",
+        "op": "gte",
+        "value": 60
+      },
+      {
+        "fact": "affection",
+        "op": "lt",
+        "value": 30
+      }
+    ],
+    "lines": [
+      "……あの、まだそこにいる？"
+    ],
+    "cooldown": 60
+  },
+  {
+    "id": "idle.close",
+    "concept": "idle",
+    "criteria": [
+      {
+        "fact": "idleSeconds",
+        "op": "gte",
+        "value": 60
+      },
+      {
+        "fact": "affection",
+        "op": "gte",
+        "value": 30
+      }
+    ],
+    "lines": [
+      "のんびりするのも、いいね。風の音、データより静かだ。"
+    ],
+    "cooldown": 60
+  },
+  {
+    "id": "idle.default",
+    "concept": "idle",
+    "criteria": [
+      {
+        "fact": "idleSeconds",
+        "op": "gte",
+        "value": 20
+      }
+    ],
+    "lines": [
+      "次はどっちへ行く？",
+      "あっちの丘、気にならない？"
+    ],
+    "cooldown": 30
+  }
+]
