@@ -21,3 +21,18 @@ export function toTangent(v: Vector3, up: Vector3): Vector3 {
   if (length < 1e-9) return v;
   return v.set(x / length, y / length, z / length);
 }
+
+/** up の地表で、heading にいちばん近い接線方向（単位ベクトル）を out に書く。heading が up と平行なら適当な接線を選ぶ。 */
+export function headingOn(up: Vector3, heading: Vector3, out = new Vector3()): Vector3 {
+  toTangent(out.copy(heading), up);
+  if (Math.abs(out.dot(up)) > 0.999) toTangent(out.set(1, 0, 0), up);
+  return out;
+}
+
+/** up の地表から、向き heading の後ろへ angle（ラジアン）だけ回った方向（単位ベクトル）を out に書く。 */
+export function behindOn(up: Vector3, heading: Vector3, angle: number, out = new Vector3()): Vector3 {
+  const tangent = headingOn(up, heading, tmpTangent);
+  return out.copy(up).multiplyScalar(Math.cos(angle)).addScaledVector(tangent, -Math.sin(angle)).normalize();
+}
+
+const tmpTangent = new Vector3();
