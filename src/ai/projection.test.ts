@@ -19,6 +19,13 @@ describe('projectionNoise', () => {
     expect(projectionNoise(range, DEFAULT_PROJECTION_CONFIG)).toBe(1);
     expect(projectionNoise(range * 3, DEFAULT_PROJECTION_CONFIG)).toBe(1);
   });
+
+  it('noiseFrom が range 以上の設定でも NaN にならず、範囲の内外で 0 か 1 になる', () => {
+    const config = { ...DEFAULT_PROJECTION_CONFIG, noiseFrom: range };
+    expect(projectionNoise(range - 0.1, config)).toBe(0);
+    expect(projectionNoise(range, config)).toBe(1);
+    expect(projectionNoise(range + 1, { ...config, noiseFrom: range + 2 })).toBe(1);
+  });
 });
 
 describe('Projector', () => {

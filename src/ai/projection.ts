@@ -7,7 +7,7 @@
 export interface ProjectionConfig {
   /** 腕輪からこの距離までしか体を出せない */
   range: number;
-  /** この距離からノイズが走り始め、range で最大になる */
+  /** この距離からノイズが走り始め、range で最大になる（range より小さいこと） */
   noiseFrom: number;
   /** 範囲の外にこの秒数いたら、映し直しを始める（一瞬はみ出しただけでは消えない） */
   outsideGrace: number;
@@ -24,6 +24,8 @@ export const DEFAULT_PROJECTION_CONFIG: Readonly<ProjectionConfig> = {
 
 /** 腕輪からの距離に応じたノイズの強さ（0〜1）。 */
 export function projectionNoise(distance: number, config: ProjectionConfig): number {
+  // noiseFrom が range 以上の設定でも 0 除算で NaN にならないよう、範囲の内外だけで決める
+  if (config.range <= config.noiseFrom) return distance >= config.range ? 1 : 0;
   const t = (distance - config.noiseFrom) / (config.range - config.noiseFrom);
   return Math.min(1, Math.max(0, t));
 }

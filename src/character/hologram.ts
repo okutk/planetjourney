@@ -41,8 +41,15 @@ export class HologramLook {
 
   constructor(private readonly vrm: VRM) {
     vrm.scene.traverse((object: Object3D) => stripOutline(object));
+    // 外した輪郭線マテリアルは vrm.materials からも取り除く（vrm.update() が毎フレーム回す対象に残さない）
+    if (vrm.materials) {
+      for (let i = vrm.materials.length - 1; i >= 0; i--) {
+        const material = vrm.materials[i];
+        if (material instanceof MToonMaterial && material.isOutline) vrm.materials.splice(i, 1);
+      }
+    }
     for (const material of vrm.materials ?? []) {
-      if (!(material instanceof MToonMaterial) || material.isOutline) continue;
+      if (!(material instanceof MToonMaterial)) continue;
       this.materials.push(material);
       material.transparent = true;
       // 半透明でも深度を書き、体の奥の面が手前に透けて見えないようにする
