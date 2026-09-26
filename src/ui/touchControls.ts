@@ -57,7 +57,9 @@ export class TouchControls {
     surface.addEventListener('contextmenu', this.onContextMenu);
     surface.addEventListener('wheel', this.onWheel, { passive: false });
     this.jumpButton.addEventListener('pointerdown', this.onJumpDown);
-    this.actionButton.addEventListener('pointerdown', this.onActionDown);
+    // 「調べる」は click で受ける。pointerdown で受けると、指を離したときの click が、そのあいだに開いた
+    // 星図のカードに落ちてしまう（ジャンプは反応の速さを優先して pointerdown のまま）
+    this.actionButton.addEventListener('click', this.onActionClick);
   }
 
   /** 前回呼んでからのカメラの回転量（ラジアン。右へのドラッグで正）を取り出す。 */
@@ -123,7 +125,7 @@ export class TouchControls {
     this.surface.removeEventListener('contextmenu', this.onContextMenu);
     this.surface.removeEventListener('wheel', this.onWheel);
     this.jumpButton.removeEventListener('pointerdown', this.onJumpDown);
-    this.actionButton.removeEventListener('pointerdown', this.onActionDown);
+    this.actionButton.removeEventListener('click', this.onActionClick);
     this.stickBase.remove();
     this.jumpButton.remove();
     this.actionButton.remove();
@@ -195,8 +197,7 @@ export class TouchControls {
     this.jump = true;
   };
 
-  private readonly onActionDown = (event: PointerEvent): void => {
-    event.preventDefault();
+  private readonly onActionClick = (): void => {
     this.action = true;
   };
 

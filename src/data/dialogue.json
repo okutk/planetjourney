@@ -10,7 +10,8 @@
       },
       {
         "fact": "planet",
-        "op": "exists"
+        "op": "eq",
+        "value": "はじまりの星"
       }
     ],
     "lines": [
@@ -18,6 +19,46 @@
     ],
     "once": true,
     "expression": "surprised"
+  },
+  {
+    "id": "greet.crystal.first",
+    "concept": "greet",
+    "criteria": [
+      {
+        "fact": "visits",
+        "op": "eq",
+        "value": 1
+      },
+      {
+        "fact": "planet",
+        "op": "eq",
+        "value": "水晶の星"
+      }
+    ],
+    "lines": [
+      "水晶の星……。データでは『地表の 70% が結晶』。でも、光がこんなふうに跳ねるなんて、数字には書いてなかった。"
+    ],
+    "once": true
+  },
+  {
+    "id": "greet.ocean.first",
+    "concept": "greet",
+    "criteria": [
+      {
+        "fact": "visits",
+        "op": "eq",
+        "value": 1
+      },
+      {
+        "fact": "planet",
+        "op": "eq",
+        "value": "海だけの星"
+      }
+    ],
+    "lines": [
+      "海だけの星。『陸地なし』って、データにはあった。……この島、データにないよ。"
+    ],
+    "once": true
   },
   {
     "id": "greet.planet",

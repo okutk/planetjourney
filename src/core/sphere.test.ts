@@ -1,6 +1,6 @@
 import { Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
-import { alignToUp, toTangent, upAt } from './sphere';
+import { alignToUp, behindOn, headingOn, toTangent, upAt } from './sphere';
 
 describe('upAt', () => {
   it('中心から位置へ向かう単位ベクトルを返す', () => {
@@ -36,5 +36,26 @@ describe('toTangent', () => {
   it('up と平行なら変更しない', () => {
     const v = toTangent(new Vector3(0, 2, 0), new Vector3(0, 1, 0));
     expect(v.toArray()).toEqual([0, 2, 0]);
+  });
+});
+
+describe('headingOn / behindOn', () => {
+  it('heading を地表に沿わせ、up と平行なら適当な接線を選ぶ', () => {
+    const up = new Vector3(0, 1, 0);
+    expect(headingOn(up, new Vector3(0, 0.5, 1)).toArray()).toEqual([0, 0, 1]);
+    const fallback = headingOn(up, new Vector3(0, 1, 0));
+    expect(fallback.length()).toBeCloseTo(1);
+    expect(fallback.dot(up)).toBeCloseTo(0);
+  });
+
+  it('向きの後ろへ angle だけ回った地表の方向を返す', () => {
+    const up = new Vector3(0, 1, 0);
+    const behind = behindOn(up, new Vector3(0, 0, 1), Math.PI / 2);
+    expect(behind.x).toBeCloseTo(0);
+    expect(behind.y).toBeCloseTo(0);
+    expect(behind.z).toBeCloseTo(-1);
+    const tilted = behindOn(new Vector3(1, 1, 0).normalize(), new Vector3(0, 0, 1), 0.3);
+    expect(tilted.length()).toBeCloseTo(1);
+    expect(tilted.dot(new Vector3(1, 1, 0).normalize())).toBeCloseTo(Math.cos(0.3));
   });
 });
