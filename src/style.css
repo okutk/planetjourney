@@ -29,3 +29,56 @@ body {
   opacity: 0.8;
   pointer-events: none;
 }
+
+/* タッチ操作 */
+#controls {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.stick-base {
+  position: absolute;
+  top: -56px;
+  left: -56px;
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  border: 2px solid rgba(232, 236, 255, 0.35);
+  background: rgba(232, 236, 255, 0.08);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.stick-base.active {
+  opacity: 1;
+}
+
+.stick-knob {
+  position: absolute;
+  top: 28px;
+  left: 28px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(232, 236, 255, 0.5);
+}
+
+.jump-button {
+  position: absolute;
+  right: max(24px, env(safe-area-inset-right));
+  bottom: max(24px, env(safe-area-inset-bottom));
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  border: 2px solid rgba(232, 236, 255, 0.5);
+  background: rgba(244, 199, 216, 0.35);
+  color: #e8ecff;
+  font: 600 14px system-ui, sans-serif;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.jump-button:active {
+  background: rgba(244, 199, 216, 0.6);
+}

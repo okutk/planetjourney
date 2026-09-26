@@ -130,3 +130,31 @@ describe('SphericalWalker', () => {
     expect(new Vector3(0, 0, 1).applyQuaternion(q).distanceTo(walker.forward)).toBeCloseTo(0);
   });
 });
+
+describe('SphericalWalker の向きの制御', () => {
+  it('faceTowards は目標の向きへ最大 maxAngle だけ回る', () => {
+    const walker = createWalker();
+    // 北極で +Z を向いている。+X は左手側（上から見て反時計回りに 90°）
+    walker.faceTowards(new Vector3(1, 0, 0), 0.1);
+    const angle = Math.atan2(walker.forward.x, walker.forward.z);
+    expect(angle).toBeCloseTo(0.1);
+
+    walker.faceTowards(new Vector3(1, 5, 0), Math.PI);
+    expect(walker.forward.distanceTo(new Vector3(1, 0, 0))).toBeLessThan(1e-9);
+
+    walker.faceTowards(new Vector3(0, 0, -1), 0.2); // 近いほう（左回り）へ回る
+    expect(Math.atan2(walker.forward.x, walker.forward.z)).toBeCloseTo(Math.PI / 2 + 0.2);
+  });
+
+  it('lastRotation は動いた分の回転で、止まっていれば回転なし', () => {
+    const walker = createWalker();
+    const heading = walker.forward.clone();
+    const before = walker.position.clone();
+    walker.step(WALK, DT);
+    expect(before.applyQuaternion(walker.lastRotation).distanceTo(walker.position)).toBeLessThan(1e-9);
+    expect(heading.applyQuaternion(walker.lastRotation).distanceTo(walker.forward)).toBeLessThan(1e-9);
+
+    walker.step(IDLE, DT);
+    expect(walker.lastRotation.w).toBe(1);
+  });
+});
