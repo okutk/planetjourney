@@ -119,7 +119,6 @@ export class GimmickView {
     for (const geometry of this.geometries) geometry.dispose();
     this.lit.dispose();
     this.effectMaterial.dispose();
-    (this.group.children[0] as Mesh | undefined)?.material;
     this.group.traverse((object) => {
       const material = (object as Mesh).material;
       if (material instanceof MeshStandardMaterial && material !== this.lit && material !== this.effectMaterial) {

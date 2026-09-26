@@ -237,7 +237,7 @@ function createPlanetStage(info: PlanetInfo): PlanetStage {
         position: pod.position,
         label: '船に戻る',
         radius: ACTION_RADIUS,
-        available: () => true,
+        available: () => task === null, // ミラが作業しているあいだは戻れない（作業を置き去りにしないように）
         act: () => switchTo(shipStage),
       },
       ...gimmicks.map(({ def, view: gimmickView }) => ({
@@ -271,12 +271,15 @@ function createPlanetStage(info: PlanetInfo): PlanetStage {
       if (miraIntent.amount === 0) mira.faceTowards(miraIntent.direction, TURN_SPEED * dt);
       const event = run.update(dt, distance <= ARRIVE_RADIUS, walker.position.distanceTo(gimmickView.position));
       gimmickView.setWorking(run.phase === 'work' ? run.progress : null);
+      // 結果のセリフは、頼んだセリフの途中でも打ち切って必ず話す（TalkDirector 側で打ち切る。音もここで止める）
       if (event === 'done') {
         journey.solve(info.id, run.gimmick.id);
         gimmickView.setSolved(true);
+        voice.stop();
         say(talk.finishTask(now, journey.solvedCount), now);
       } else if (event === 'cancelled') {
         gimmickView.setSolved(false);
+        voice.stop();
         say(talk.cancelTask(now), now);
       }
       if (!run.active) task = null;

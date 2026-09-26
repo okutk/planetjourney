@@ -69,14 +69,28 @@ describe('TalkDirector', () => {
 
   it('仕掛けを頼むと種類ごとのセリフで応え、終えると報告し、離れると止まったことを言う', () => {
     const director = createDirector();
-    const ask = director.askTask(0, 'scan', '刻まれた石');
+    // 灯りを先に解いても、初めてのスキャンには「最初の発見」のセリフが出る
+    expect(director.askTask(0, 'light', '消えた灯り')?.ruleId).toBe('ask.light');
+    expect(director.finishTask(10, 1)?.ruleId).toBe('taskDone.light');
+    const ask = director.askTask(20, 'scan', '刻まれた石');
     expect(ask?.ruleId).toBe('ask.scan');
     expect(ask?.text).toContain('刻まれた石');
-    expect(director.finishTask(10, 1)?.ruleId).toBe('taskDone.scan.first');
-    expect(director.askTask(20, 'light', '消えた灯り')?.ruleId).toBe('ask.light');
-    expect(director.cancelTask(30)?.ruleId).toBe('taskCancelled.default');
+    expect(director.finishTask(30, 2)?.ruleId).toBe('taskDone.scan.first');
+    expect(director.facts.scanDone).toBe(1);
     expect(director.askTask(40, 'crawl', '岩のすきま')?.ruleId).toBe('ask.crawl');
-    expect(director.finishTask(50, 2)?.ruleId).toBe('taskDone.crawl');
+    expect(director.cancelTask(50)?.ruleId).toBe('taskCancelled.default');
+    expect(director.askTask(60, 'crawl', '岩のすきま')?.ruleId).toBe('ask.crawl');
+    expect(director.finishTask(70, 3)?.ruleId).toBe('taskDone.crawl');
+  });
+
+  it('結果のセリフは、頼んだセリフの途中や直後でも打ち切って必ず出る', () => {
+    const director = new TalkDirector(new DialogueSelector(rules, createRandom(1)), () => 3);
+    director.enterPlanet('origin', 'はじまりの星', 1);
+    director.askTask(0, 'light', '消えた灯り');
+    expect(director.isSpeaking(1)).toBe(true);
+    expect(director.finishTask(1, 1)?.ruleId).toBe('taskDone.light');
+    director.askTask(10, 'scan', '刻まれた石');
+    expect(director.cancelTask(10.5)?.ruleId).toBe('taskCancelled.default');
   });
 
   it('打ち切ると、話している途中でも次のセリフを話せる', () => {

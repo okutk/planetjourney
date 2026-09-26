@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { MiraTask, type GimmickDef } from './gimmick';
+import { DEFAULT_PROJECTION_CONFIG } from '../ai/projection';
+import { MiraTask, PROJECTION_RANGE, type GimmickDef } from './gimmick';
 
 const LANTERN: GimmickDef = { id: 'lantern', kind: 'light', name: '灯り', direction: [0, 1, 0] };
+
+describe('PROJECTION_RANGE', () => {
+  it('ミラの投影範囲より少し短く、映し直される前に作業が止まる', () => {
+    expect(PROJECTION_RANGE).toBeGreaterThan(0);
+    expect(PROJECTION_RANGE).toBeLessThan(DEFAULT_PROJECTION_CONFIG.range);
+  });
+});
 
 describe('MiraTask', () => {
   it('着くまでは進まず、着いたら作業を始め、時間がたてば終わる', () => {

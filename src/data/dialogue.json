@@ -296,7 +296,7 @@
         "value": "scan"
       },
       {
-        "fact": "solved",
+        "fact": "scanDone",
         "op": "eq",
         "value": 1
       },

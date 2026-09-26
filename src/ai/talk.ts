@@ -38,14 +38,21 @@ export class TalkDirector {
     return this.say('ask', now);
   }
 
-  /** 仕掛けの作業を終えたとき。solved は解いた仕掛けの合計。 */
+  /**
+   * 仕掛けの作業を終えたとき。solved は解いた仕掛けの合計。種類ごとの回数（scanDone など）も数える。
+   * 結果はプレイヤーが待っているものなので、頼んだセリフの途中でも打ち切って必ず話す。
+   */
   finishTask(now: number, solved: number): DialogueLine | null {
     this.facts.solved = solved;
+    const key = `${String(this.facts.task)}Done`;
+    this.facts[key] = ((this.facts[key] as number | undefined) ?? 0) + 1;
+    this.interrupt();
     return this.say('taskDone', now);
   }
 
-  /** プレイヤーが離れて投影が届かず、作業が止まったとき。 */
+  /** プレイヤーが離れて投影が届かず、作業が止まったとき。頼んだ直後でも打ち切って話す。 */
   cancelTask(now: number): DialogueLine | null {
+    this.interrupt();
     return this.say('taskCancelled', now);
   }
 
