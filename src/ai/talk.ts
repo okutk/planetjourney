@@ -18,12 +18,35 @@ export class TalkDirector {
     private readonly durationOf: (text: string) => number,
   ) {}
 
-  /** 星に降りたとき。visits はその星に降りた回数（初めてなら 1）。事実だけを更新し、あいさつは greet() で話す。 */
-  enterPlanet(planet: string, visits: number): void {
+  /**
+   * 星に降りたとき。planetId は星の id（セリフの条件に使う）、planet は表示名（セリフの {planet} に入る）、
+   * visits はその星に降りた回数（初めてなら 1）。事実だけを更新し、あいさつは greet() で話す。
+   */
+  enterPlanet(planetId: string, planet: string, visits: number): void {
     this.facts.place = 'planet';
+    this.facts.planetId = planetId;
     this.facts.planet = planet;
     this.facts.visits = visits;
     this.facts.idleSeconds = 0;
+  }
+
+  /** 仕掛けをミラに頼んだとき。task は仕掛けの種類、target は表示名（セリフの {target} に入る）。 */
+  askTask(now: number, task: string, target: string): DialogueLine | null {
+    this.facts.task = task;
+    this.facts.target = target;
+    this.facts.idleSeconds = 0;
+    return this.say('ask', now);
+  }
+
+  /** 仕掛けの作業を終えたとき。solved は解いた仕掛けの合計。 */
+  finishTask(now: number, solved: number): DialogueLine | null {
+    this.facts.solved = solved;
+    return this.say('taskDone', now);
+  }
+
+  /** プレイヤーが離れて投影が届かず、作業が止まったとき。 */
+  cancelTask(now: number): DialogueLine | null {
+    return this.say('taskCancelled', now);
   }
 
   /** 船の部屋に入ったとき（旅の始まりと、星から戻ったとき）。planet には最後に降りた星が残る。 */

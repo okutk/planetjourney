@@ -23,10 +23,11 @@ import { VoicePlayer } from './audio/voicePlayer';
 import { createRandom } from './core/noise';
 import dialogueData from './data/dialogue.json';
 import { SpeechBubble } from './ui/speechBubble';
-import { DEFAULT_FOLLOW_CONFIG, followIntent, followSlot, type FollowIntent } from './ai/companion';
+import { DEFAULT_FOLLOW_CONFIG, followIntent, followSlot, seekIntent, type FollowIntent } from './ai/companion';
 import { MiraView } from './character/mira';
 import { Journey } from './core/journey';
-import { parsePlanets, type PlanetInfo } from './core/planets';
+import { ACTION_RADIUS, parsePlanets, POD_ANGLE, type PlanetInfo } from './core/planets';
+import { ARRIVE_RADIUS, MiraTask, REQUEST_RADIUS } from './core/gimmick';
 import { DEFAULT_ORBIT_CAMERA_CONFIG, OrbitCamera } from './core/orbitCamera';
 import { RoomWalker } from './core/roomWalker';
 import { behindOn } from './core/sphere';
@@ -38,6 +39,7 @@ import { FADE_SECONDS, Fader } from './ui/fade';
 import { PerfOverlay } from './ui/perfOverlay';
 import { StarMapPanel } from './ui/starMap';
 import { TouchControls } from './ui/touchControls';
+import { GimmickView } from './world/gimmickView';
 import { LandingPod } from './world/landingPod';
 import { PlanetView } from './world/planet';
 import { SHIP_ROOM, ShipRoomView } from './world/shipRoom';
@@ -47,6 +49,8 @@ import { WarpStreaks } from './world/warpStreaks';
 // 船の部屋は最後に降りた星のそばに浮かんでいて、窓から星が見える。星図の台に近づいて「星図」を開き、
 // 星を選ぶとワープして降りる（星の見た目は降りるたびに作り、前の星は捨てる）。
 // 星の上では着陸ポッドのそばで「船に戻る」と部屋へ戻る。
+// 星には仕掛け（灯り・刻まれた石・岩のすきま）があり、近づいて「ミラに頼む」とミラが歩いていって解く。
+// ミラは腕輪の投影なので、作業のあいだプレイヤーがそばにいないと止まる（役割分担）。
 // 操作（移動はカメラから見た向き。プレイヤーは進む方向へ向き直る）
 //   タッチ: 左半分に仮想スティック、右半分のドラッグでカメラを回す（上下で見下ろす角度）、右下のボタンでジャンプ、
 //   調べられる物の近くではその上に「星図」「船に戻る」のボタン
@@ -64,7 +68,6 @@ const MIRA_WALK_SPEED = 5.5; // プレイヤーより少し速く、離されて
 const CAMERA_DAMPING = 6; // 大きいほどカメラがすぐ追いつく
 const KEY_CAMERA_SPEED = 2; // 矢印キーでカメラを回す速さ（ラジアン/秒）
 const BODY_RADIUS = 0.3; // プレイヤーの体の太さ（壁や台にめり込まない距離）
-const ACTION_RADIUS = 1.4; // 調べられる物から、この距離まで近づくとボタンが出る
 const ARRIVE_TALK_DELAY = 1; // 場所に入ってから話し始めるまで（秒）
 const WARP_LINE_MARGIN = 0.6; // ワープのセリフを言い切ってから暗転するまでの間（秒）
 
@@ -86,10 +89,6 @@ scene.add(sun);
 // 星はいつも原点に置く（船の部屋はそのそばに浮かぶ）
 const planetCenter = new Vector3();
 const SPAWN_HEADING = new Vector3(0, 0, 1); // 降りたときに向く方向（地表に沿うよう補正する）
-// 着陸ポッドは出現位置の少し後ろ。降りた直後は目の前ではなく、振り返ると見える。
-// 降りた瞬間に「船に戻る」が出ないよう、ボタンの出る距離より確実に離す（地形の起伏があっても届かない角度。
-// 半径 5 の星を基準にした角度なので、大きい星ではもう少し離れる）
-const POD_ANGLE = (ACTION_RADIUS * 1.5) / 5;
 
 // 船の部屋。星のそばに浮かべ、星の上にいるあいだは隠す
 const shipRoom = new ShipRoomView();
@@ -129,17 +128,28 @@ const roomConfig = {
   obstacles: [SHIP_ROOM.console],
 };
 
+/** 調べられる物。近づくとボタンが出て、押すと act() が呼ばれる */
+interface Interactable {
+  /** 位置（ワールド座標） */
+  readonly position: Vector3;
+  /** ボタンの文言 */
+  readonly label: string;
+  /** この距離まで近づくとボタンが出る */
+  readonly radius: number;
+  /** いま調べられるか（解き終えた仕掛けなどは false） */
+  available(): boolean;
+  act(): void;
+}
+
 /** 場所（船の部屋・星）。それぞれの歩き手と、調べられる物を持つ */
 interface Stage {
   readonly walker: Walker;
   readonly mira: Walker;
-  /** 調べられる物の位置（ワールド座標）と、近づいたときのボタンの文言 */
-  readonly spot: Vector3;
-  readonly spotLabel: string;
+  readonly interactables: readonly Interactable[];
   /** この場所に入ったとき。プレイヤーとミラを出現位置に置き、会話の事実（いる場所）を更新する */
   enter(): void;
-  /** ボタンが押されたとき（暗転の先で次の場所へ移る） */
-  act(): void;
+  /** 毎フレーム呼ぶ。ミラの動き（miraIntent）を自分で決めたら true（そのフレームはついてこない） */
+  update(dt: number): boolean;
 }
 
 const journey = new Journey();
@@ -149,8 +159,20 @@ const shipMira = new RoomWalker({ ...roomConfig, walkSpeed: MIRA_WALK_SPEED });
 const shipStage: Stage = {
   walker: shipWalker,
   mira: shipMira,
-  spot: new Vector3(SHIP_ROOM.console.x, 0, SHIP_ROOM.console.z).add(SHIP_POSITION),
-  spotLabel: '星図',
+  interactables: [
+    {
+      position: new Vector3(SHIP_ROOM.console.x, 0, SHIP_ROOM.console.z).add(SHIP_POSITION),
+      label: '星図',
+      radius: ACTION_RADIUS,
+      available: () => true,
+      act() {
+        starMap.open(journey.planet);
+        touch.release();
+        say(talk.openedStarMap(now), now);
+      },
+    },
+  ],
+  update: () => false,
   enter() {
     hud.textContent = '船の部屋';
     shipRoom.group.visible = true;
@@ -160,11 +182,6 @@ const shipStage: Stage = {
     shipWalker.placeAt(0, 1.5, new Vector3(0, 0, -1));
     const slot = followSlot(shipWalker, DEFAULT_FOLLOW_CONFIG, new Vector3()).sub(SHIP_POSITION);
     shipMira.placeAt(slot.x, slot.z, shipWalker.forward);
-  },
-  act() {
-    starMap.open(journey.planet);
-    touch.release();
-    say(talk.openedStarMap(now), now);
   },
 };
 
@@ -186,6 +203,12 @@ function createPlanetStage(info: PlanetInfo): PlanetStage {
   });
   const pod = new LandingPod(terrain, behindOn(spawn, SPAWN_HEADING, POD_ANGLE));
   scene.add(view.group, pod.group);
+  const gimmicks = info.gimmicks.map((def) => {
+    const gimmickView = new GimmickView(terrain, def);
+    gimmickView.setSolved(journey.isSolved(info.id, def.id));
+    scene.add(gimmickView.group);
+    return { def, view: gimmickView };
+  });
   const config = {
     ...DEFAULT_WALKER_CONFIG,
     center: planetCenter,
@@ -194,27 +217,67 @@ function createPlanetStage(info: PlanetInfo): PlanetStage {
   };
   const walker = new SphericalWalker(config);
   const mira = new SphericalWalker({ ...config, walkSpeed: MIRA_WALK_SPEED });
-  return {
+  // ミラに頼んでいる作業。仕掛けごとに 1 つずつで、同時には 1 つだけ
+  let task: { run: MiraTask; view: GimmickView } | null = null;
+  const stage: PlanetStage = {
     info,
     walker,
     mira,
-    spot: pod.position,
-    spotLabel: '船に戻る',
+    interactables: [
+      {
+        position: pod.position,
+        label: '船に戻る',
+        radius: ACTION_RADIUS,
+        available: () => true,
+        act: () => switchTo(shipStage),
+      },
+      ...gimmicks.map(({ def, view: gimmickView }) => ({
+        position: gimmickView.position,
+        label: 'ミラに頼む',
+        radius: REQUEST_RADIUS,
+        available: () => task === null && !journey.isSolved(info.id, def.id),
+        act: () => {
+          task = { run: new MiraTask(def), view: gimmickView };
+          talk.interrupt();
+          voice.stop();
+          say(talk.askTask(now, def.kind, def.name), now);
+        },
+      })),
+    ],
     enter() {
       hud.textContent = info.name;
       shipRoom.group.visible = false;
-      talk.enterPlanet(info.name, journey.land(info.id));
+      talk.enterPlanet(info.id, info.name, journey.land(info.id));
       walker.placeAt(spawn, SPAWN_HEADING);
       mira.placeAt(followSlot(walker, DEFAULT_FOLLOW_CONFIG, new Vector3()).sub(planetCenter), walker.forward);
     },
-    act() {
-      switchTo(shipStage);
+    update(dt) {
+      if (!task) return false;
+      const { run, view: gimmickView } = task;
+      // 作業中のミラは仕掛けへ歩いていき、着いたら仕掛けの方を向いて作業する
+      const distance = seekIntent(mira, gimmickView.position, ARRIVE_RADIUS, 3, miraIntent);
+      if (miraIntent.amount === 0) mira.faceTowards(miraIntent.direction, TURN_SPEED * dt);
+      const event = run.update(dt, distance <= ARRIVE_RADIUS, walker.position.distanceTo(gimmickView.position));
+      gimmickView.setWorking(run.phase === 'work' ? run.progress : null);
+      if (event === 'done') {
+        journey.solve(info.id, run.gimmick.id);
+        gimmickView.setSolved(true);
+        say(talk.finishTask(now, journey.solvedCount), now);
+      } else if (event === 'cancelled') {
+        gimmickView.setSolved(false);
+        say(talk.cancelTask(now), now);
+      }
+      if (!run.active) task = null;
+      return true;
     },
     dispose() {
+      task = null;
       view.dispose();
       pod.dispose();
+      for (const { view: gimmickView } of gimmicks) gimmickView.dispose();
     },
   };
+  return stage;
 }
 
 // 船の窓から見える星。最初は一覧の先頭の星で、ワープするたびに行き先の星に入れ替える
@@ -414,19 +477,29 @@ renderer.setAnimationLoop((time) => {
   orbit.transport(walker.lastRotation, walker.up);
   orbit.update(dt, walker.forward, walker.up, stickX, stickY);
 
-  followIntent(miraWalker, walker, DEFAULT_FOLLOW_CONFIG, miraIntent);
+  // ミラ: 仕掛けの作業中は仕掛けへ歩いていき、そうでなければプレイヤーについていく
+  if (!stage.update(dt)) followIntent(miraWalker, walker, DEFAULT_FOLLOW_CONFIG, miraIntent);
   if (miraIntent.amount > 0) miraWalker.faceTowards(miraIntent.direction, TURN_SPEED * dt);
   miraInput.forward = miraIntent.amount;
   miraWalker.step(miraInput, dt);
 
-  // 調べられる物（星図の台・着陸ポッド）の近くでボタンを出し、押されたら場所を移る。
-  // あいさつを待っている間は開けない（あいさつが星図のセリフに押されて抜けないように）
-  const nearSpot =
-    !fader.busy && !paused && greetAt === Infinity && walker.position.distanceTo(stage.spot) < ACTION_RADIUS;
-  touch.setAction(nearSpot ? stage.spotLabel : null);
+  // 調べられる物（星図の台・着陸ポッド・仕掛け）のいちばん近くにあるものにボタンを出し、押されたら act() を呼ぶ。
+  // あいさつを待っている間は出さない（あいさつが星図のセリフに押されて抜けないように）
+  let near: Interactable | null = null;
+  if (!fader.busy && !paused && greetAt === Infinity) {
+    let nearest = Infinity;
+    for (const item of stage.interactables) {
+      const distance = walker.position.distanceTo(item.position);
+      if (distance < item.radius && distance < nearest && item.available()) {
+        nearest = distance;
+        near = item;
+      }
+    }
+  }
+  touch.setAction(near?.label ?? null);
   const action = touch.consumeAction() || actionRequested;
   actionRequested = false;
-  if (nearSpot && action) stage.act();
+  if (near && action) near.act();
 
   // ワープ: 流れる星を進め、暗転に入る瞬間に行き先の星へ降りる（暗転中は移れないが、星図は暗転中に開けないので起きないはず）
   if (warp.update(dt) && !warpTo(destination)) console.warn('ワープ先へ移れなかった（暗転中）');

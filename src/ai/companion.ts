@@ -43,6 +43,30 @@ export function followSlot(player: Walker, config: FollowConfig, out: Vector3): 
     .addScaledVector(tmpRight, config.side);
 }
 
+/** 目標へ向かうときの最低の歩く量。近づくほど遅くなるが、これより遅くはならない（着く前に止まらないように） */
+const MIN_SEEK_AMOUNT = 0.3;
+
+/**
+ * 目標の地点（ワールド座標）へ向かう動きを決める（ミラが仕掛けへ歩いていくとき）。描画や DOM には依存しない。
+ * 目標から arriveRadius 以内なら止まり、slowRadius より遠いと全力で歩く。目標までの直線距離を返す。
+ */
+export function seekIntent(
+  mira: Walker,
+  target: Vector3,
+  arriveRadius: number,
+  slowRadius: number,
+  out: FollowIntent,
+): number {
+  out.direction.subVectors(target, mira.position);
+  const distance = out.direction.length();
+  toTangent(out.direction, mira.up);
+  out.amount =
+    distance <= arriveRadius
+      ? 0
+      : Math.max(MIN_SEEK_AMOUNT, Math.min(1, (distance - arriveRadius) / (slowRadius - arriveRadius)));
+  return distance;
+}
+
 /**
  * プレイヤーの斜め後ろの「定位置」へ向かう動きを決める。描画や DOM には依存しない。
  * プレイヤーが向きを変えると定位置も動くので、ミラはプレイヤーのまわりを回り込んでついてくる。

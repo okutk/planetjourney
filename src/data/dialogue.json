@@ -9,9 +9,9 @@
         "value": 1
       },
       {
-        "fact": "planet",
+        "fact": "planetId",
         "op": "eq",
-        "value": "はじまりの星"
+        "value": "origin"
       }
     ],
     "lines": [
@@ -29,9 +29,9 @@
         "value": 1
       },
       {
-        "fact": "planet",
+        "fact": "planetId",
         "op": "eq",
-        "value": "水晶の星"
+        "value": "crystal"
       }
     ],
     "lines": [
@@ -49,9 +49,9 @@
         "value": 1
       },
       {
-        "fact": "planet",
+        "fact": "planetId",
         "op": "eq",
-        "value": "海だけの星"
+        "value": "ocean"
       }
     ],
     "lines": [
@@ -201,6 +201,170 @@
       "{destination}へ。座標、入力完了。",
       "{destination}か。今度は何が見つかるかな。"
     ]
+  },
+  {
+    "id": "ask.light",
+    "concept": "ask",
+    "criteria": [
+      {
+        "fact": "task",
+        "op": "eq",
+        "value": "light"
+      },
+      {
+        "fact": "target",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "うん、{target}を照らすね。……こういうの、データより得意かも。",
+      "照らすのは得意。そばにいてね、投影が届くように。"
+    ]
+  },
+  {
+    "id": "ask.scan",
+    "concept": "ask",
+    "criteria": [
+      {
+        "fact": "task",
+        "op": "eq",
+        "value": "scan"
+      },
+      {
+        "fact": "target",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "スキャン開始。{target}の……データを取るね。",
+      "{target}、調べてみる。ちょっと待ってて。"
+    ]
+  },
+  {
+    "id": "ask.crawl",
+    "concept": "ask",
+    "criteria": [
+      {
+        "fact": "task",
+        "op": "eq",
+        "value": "crawl"
+      },
+      {
+        "fact": "target",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "{target}？ 大丈夫、わたしは体がないから、すり抜けられる。",
+      "狭い所はわたしの出番。……ちょっと、どきどきするけど。"
+    ]
+  },
+  {
+    "id": "ask.default",
+    "concept": "ask",
+    "criteria": [],
+    "lines": [
+      "まかせて。"
+    ]
+  },
+  {
+    "id": "taskDone.light",
+    "concept": "taskDone",
+    "criteria": [
+      {
+        "fact": "task",
+        "op": "eq",
+        "value": "light"
+      },
+      {
+        "fact": "target",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "点いた。……明かりって、あったかいんだね。データでは、温度のことだと思ってた。",
+      "{target}、点灯。これで少し、この星が見やすくなった。"
+    ]
+  },
+  {
+    "id": "taskDone.scan.first",
+    "concept": "taskDone",
+    "criteria": [
+      {
+        "fact": "task",
+        "op": "eq",
+        "value": "scan"
+      },
+      {
+        "fact": "solved",
+        "op": "eq",
+        "value": 1
+      },
+      {
+        "fact": "target",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "スキャン完了。{target}……記録にない組成。つまり、新発見。……わたしたちの、最初の発見。"
+    ],
+    "once": true
+  },
+  {
+    "id": "taskDone.scan",
+    "concept": "taskDone",
+    "criteria": [
+      {
+        "fact": "task",
+        "op": "eq",
+        "value": "scan"
+      },
+      {
+        "fact": "target",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "スキャン完了。{target}のデータ、記録した。……データにない所も、あった。",
+      "{target}、解析終わり。この星、まだ知らないことだらけだね。"
+    ]
+  },
+  {
+    "id": "taskDone.crawl",
+    "concept": "taskDone",
+    "criteria": [
+      {
+        "fact": "task",
+        "op": "eq",
+        "value": "crawl"
+      },
+      {
+        "fact": "target",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "{target}の奥に、何かある。……まだ持てないけど、場所は覚えておく。",
+      "奥まで行ってきた。狭かった……たぶん。体がないから、よく分からないけど。"
+    ]
+  },
+  {
+    "id": "taskDone.default",
+    "concept": "taskDone",
+    "criteria": [],
+    "lines": [
+      "できたよ。"
+    ]
+  },
+  {
+    "id": "taskCancelled.default",
+    "concept": "taskCancelled",
+    "criteria": [],
+    "lines": [
+      "……離れすぎ。投影が届かない。もう少しそばにいて。",
+      "あっ、切れちゃった。腕輪から離れると、わたし、そこにいられないの。"
+    ],
+    "cooldown": 5
   },
   {
     "id": "jump.first",
