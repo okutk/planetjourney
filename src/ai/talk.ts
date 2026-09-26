@@ -51,8 +51,12 @@ export class TalkDirector {
     this.setClock(hour);
     this.startVisit(log, nowMs);
     this.facts.idleSeconds = 0;
+    // 話すセリフがあるときだけ、話している途中のセリフを打ち切る（なければ続きをそのまま話す）
+    const busyUntil = this.busyUntil;
     this.interrupt();
-    return this.say('resume', now);
+    const line = this.say('resume', now);
+    if (!line) this.busyUntil = busyUntil;
+    return line;
   }
 
   /**

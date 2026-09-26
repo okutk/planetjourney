@@ -367,6 +367,10 @@
         "fact": "daysAway",
         "op": "gte",
         "value": 7
+      },
+      {
+        "fact": "clockRewound",
+        "op": "missing"
       }
     ],
     "lines": [

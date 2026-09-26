@@ -155,7 +155,9 @@ document.addEventListener('visibilitychange', () => {
   // 再読み込みせずに戻ってきたときも、前回と比べて「N 日ぶり」や深夜の反応をする。
   // 隠れている間はループが止まっていて now が古いので、ループと同じ時計で進めてから話す
   now = performance.now() / 1000;
-  say(talk.resume(playLog, Date.now(), new Date().getHours(), now), now);
+  const line = talk.resume(playLog, Date.now(), new Date().getHours(), now);
+  if (line) voice.stop(); // 前のセリフの音と重ならないように
+  say(line, now);
   recordPlayTime();
 });
 

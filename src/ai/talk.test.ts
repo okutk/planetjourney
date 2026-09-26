@@ -255,6 +255,21 @@ describe('TalkDirector', () => {
       expect(director.facts.daysAway).toBeUndefined();
       expect(director.facts.clockRewound).toBe(true);
     });
+
+    it('10 日ぶりに深夜に戻ったら、深夜の反応より久しぶりの反応を選ぶ', () => {
+      for (let seed = 1; seed <= 20; seed++) {
+        const director = new TalkDirector(new DialogueSelector(rules, createRandom(seed)), () => 2);
+        expect(director.resume({ lastPlayedAt: T0 }, T0 + 10 * DAY, 2, 0)?.ruleId).toBe('resume.longAway');
+      }
+    });
+
+    it('戻ったときに話すことがなければ、話している途中のセリフを打ち切らない', () => {
+      const director = new TalkDirector(new DialogueSelector(rules, createRandom(1)), () => 5);
+      director.enterShip();
+      director.greet(0);
+      expect(director.resume({ lastPlayedAt: T0 }, T0 + 1000, 14, 1)).toBeNull();
+      expect(director.isSpeaking(2)).toBe(true);
+    });
   });
 });
 
