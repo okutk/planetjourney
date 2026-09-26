@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_IDLE_CONFIG,
+  DEFAULT_SIT_CONFIG,
   DEFAULT_WALK_CONFIG,
   createPose,
   idlePose,
+  sitPose,
   walkPose,
   type Pose,
 } from './gait';
@@ -93,3 +95,21 @@ describe('idlePose', () => {
     expect(Math.abs(idle.armDown - walk.armDown)).toBeLessThan(0.2);
   });
 });
+
+describe('sitPose', () => {
+  it('腰を落として膝を曲げ、呼吸の周期で元の姿勢に戻る', () => {
+    const a = sitPose(0.7, DEFAULT_SIT_CONFIG, createPose());
+    expectSamePose(sitPose(0.7 + DEFAULT_SIT_CONFIG.period, DEFAULT_SIT_CONFIG, createPose()), a);
+    expect(a.hipsDrop).toBeGreaterThan(0.5);
+    expect(a.leftKnee).toBeGreaterThan(1.5);
+    expect(a.leftUpperLegPitch).toBe(a.rightUpperLegPitch);
+  });
+
+  it('待機・歩きの姿勢は腰を落とさない（座った姿勢から切り替えても前の値が残らない）', () => {
+    const pose = sitPose(0, DEFAULT_SIT_CONFIG, createPose());
+    expect(idlePose(0, DEFAULT_IDLE_CONFIG, pose).hipsDrop).toBe(0);
+    expect(sitPose(0, DEFAULT_SIT_CONFIG, pose).hipsDrop).toBe(DEFAULT_SIT_CONFIG.hipsDrop);
+    expect(walkPose(0, DEFAULT_WALK_CONFIG, pose).hipsDrop).toBe(0);
+  });
+});
+

@@ -44,6 +44,8 @@ export class MiraView {
   gazeTarget: Vector3 | null = null;
   /** 感情によるいつもの顔（表情の重み）。毎フレーム外から入れる。話すときの表情が出ているあいだは弱める */
   readonly mood: MoodFace = { happy: 0, sad: 0, relaxed: 0 };
+  /** 座っているか（自律行動の sit）。毎フレーム外から入れる */
+  sitting = false;
   /** 前のフレームに VRM へ重みを書いた表情の名前（次のフレームで 0 に戻すために覚えておく） */
   private readonly appliedExpressions: string[] = [];
   /** 差し替え用のモーション。null なら手続きのモーションを使う */
@@ -142,7 +144,7 @@ export class MiraView {
    * walkAmount は歩く量（0〜1）、noise は投影範囲の端のノイズ（0〜1）、visibility は見え方（0 で消えている）
    */
   update(dt: number, walkAmount: number, noise = 0, visibility = 1): void {
-    this.motion?.update(dt, walkAmount);
+    this.motion?.update(dt, walkAmount, this.sitting);
     this.hologram?.update(noise, visibility);
     this.updateFace(dt);
     this.vrm?.update(dt);

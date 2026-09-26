@@ -26,7 +26,15 @@ import { createRandom } from './core/noise';
 import dialogueData from './data/dialogue.json';
 import emotionData from './data/emotion.json';
 import { SpeechBubble } from './ui/speechBubble';
-import { DEFAULT_FOLLOW_CONFIG, followIntent, followSlot, seekIntent, type FollowIntent } from './ai/companion';
+import { BehaviorSelector, Curiosity, type Behavior, type Perception } from './ai/behavior';
+import {
+  DEFAULT_FOLLOW_CONFIG,
+  followIntent,
+  followSlot,
+  seekIntent,
+  type FollowConfig,
+  type FollowIntent,
+} from './ai/companion';
 import { Projector, TASK_RANGE } from './ai/projection';
 import { MiraView } from './character/mira';
 import { Journey } from './core/journey';
@@ -185,6 +193,8 @@ interface Interactable {
   readonly position: Vector3;
   /** ボタンの文言（かけらの数などで変わるので関数） */
   label(): string;
+  /** 物の名前（ミラが見に行くときのセリフの {spot} に入る） */
+  readonly name: string;
   /** この距離まで近づくとボタンが出る */
   readonly radius: number;
   /** いま調べられるか（解き終えた仕掛けなどは false） */
@@ -225,6 +235,7 @@ const shipStage: Stage = {
     {
       position: new Vector3(SHIP_ROOM.console.x, 0, SHIP_ROOM.console.z).add(SHIP_POSITION),
       label: () => '星図',
+      name: '星図の台',
       radius: ACTION_RADIUS,
       available: () => true,
       act() {
@@ -237,6 +248,7 @@ const shipStage: Stage = {
       // 投影機。かけらが足りれば段階を上げ、足りなければミラが残りの数を言う。最大まで上げたら押せない
       position: new Vector3(SHIP_ROOM.projector.x, 0, SHIP_ROOM.projector.z).add(SHIP_POSITION),
       label: () => `投影機を強化（かけら ${journey.fragments}/${journey.nextCost ?? 0}）`,
+      name: '投影機',
       radius: ACTION_RADIUS,
       available: () => journey.fragmentsNeeded !== null,
       act() {
@@ -312,6 +324,7 @@ function createPlanetStage(info: PlanetInfo): PlanetStage {
       {
         position: pod.position,
         label: () => '船に戻る',
+        name: '着陸ポッド',
         radius: ACTION_RADIUS,
         available: () => task === null, // ミラが作業しているあいだは戻れない（作業を置き去りにしないように）
         act: () => switchTo(shipStage),
@@ -319,6 +332,7 @@ function createPlanetStage(info: PlanetInfo): PlanetStage {
       ...gimmicks.map(({ def, view: gimmickView }) => ({
         position: gimmickView.position,
         label: () => 'ミラに頼む',
+        name: def.name,
         radius: REQUEST_RADIUS,
         available: () => task === null && !journey.isSolved(info.id, def.id),
         act: () => {
@@ -504,6 +518,9 @@ function enterStage(next: Stage): void {
   camera.up.copy(stage.walker.up);
   // ミラは新しい場所に置いてから、髪などの揺れを落ち着かせる（移動前の位置から振り回されないように）
   projector.reset();
+  brain.reset();
+  curiosity.reset();
+  behavior = 'follow';
   placeMira();
   mira.settle();
   greetAt = now + ARRIVE_TALK_DELAY;
@@ -547,6 +564,62 @@ const starMap = new StarMapPanel(
   },
   () => starMap.close(),
 );
+// ミラの自律行動（ユーティリティAI）。ついていく・気になる物を見に行く・座る・隠れる、のうち点数の高いものを選ぶ
+const brain = new BehaviorSelector();
+const curiosity = new Curiosity<Interactable>();
+let behavior: Behavior = 'follow';
+const perception: Perception = {
+  playerDistance: 0,
+  idleSeconds: 0,
+  interestDistance: null,
+  threatDistance: null, // 怖い物はまだない（M5 の星で足す）。いまは不安が強いときだけ隠れる
+  emotion: emotion.values,
+};
+/** 隠れるときの定位置（プレイヤーのすぐ後ろ） */
+const HIDE_CONFIG: FollowConfig = { ...DEFAULT_FOLLOW_CONFIG, behind: 0.8, side: 0.35, personalSpace: 0.55 };
+const INSPECT_ARRIVE = 1.2;
+const INSPECT_SLOW = 3;
+const SPOT_EYE_HEIGHT = 0.5; // 気になる物を見るときの高さ
+
+/** 行動を選び、その行動の動き（miraIntent）を決める。行動が変わったら、そのセリフを話す */
+function updateBehavior(dt: number, walker: Walker, miraWalker: Walker): void {
+  perception.playerDistance = walker.position.distanceTo(miraWalker.position);
+  perception.idleSeconds = talk.facts.idleSeconds as number;
+  perception.interestDistance = curiosity.nearest(stage.interactables, walker.position);
+  const next = brain.update(dt, perception);
+  if (next !== behavior) {
+    if (behavior === 'inspect') curiosity.drop();
+    behavior = next;
+    const spot = next === 'inspect' ? curiosity.target() : null;
+    say(talk.behave(now, next, spot?.name), now);
+  }
+  switch (behavior) {
+    case 'inspect': {
+      const spot = curiosity.target();
+      if (!spot) {
+        followIntent(miraWalker, walker, DEFAULT_FOLLOW_CONFIG, miraIntent);
+        break;
+      }
+      const distance = seekIntent(miraWalker, spot.position, INSPECT_ARRIVE, INSPECT_SLOW, miraIntent);
+      if (miraIntent.amount === 0) miraWalker.faceTowards(miraIntent.direction, TURN_SPEED * dt);
+      // 見終えたら一度ついていくに戻る（次の物は選び直し、また「気になる」と言ってから見に行く）
+      if (curiosity.update(dt, distance <= INSPECT_ARRIVE)) {
+        brain.reset();
+        behavior = 'follow';
+      }
+      break;
+    }
+    case 'sit':
+      miraIntent.amount = 0; // その場に座る
+      break;
+    case 'hide':
+      followIntent(miraWalker, walker, HIDE_CONFIG, miraIntent);
+      break;
+    default:
+      followIntent(miraWalker, walker, DEFAULT_FOLLOW_CONFIG, miraIntent);
+  }
+}
+
 refreshStatus();
 mira.setSolidity(journey.stage / MAX_FRAGMENT_STAGE);
 enterStage(shipStage);
@@ -590,8 +663,9 @@ renderer.setAnimationLoop((time) => {
   orbit.transport(walker.lastRotation, walker.up);
   orbit.update(dt, walker.forward, walker.up, stickX, stickY);
 
-  // ミラ: 仕掛けの作業中は仕掛けへ歩いていき、そうでなければプレイヤーについていく
-  if (!stage.update(dt)) followIntent(miraWalker, walker, DEFAULT_FOLLOW_CONFIG, miraIntent);
+  // ミラ: 仕掛けの作業中は仕掛けへ歩いていき、そうでなければ自分で行動を選ぶ
+  const working = stage.update(dt);
+  if (!working) updateBehavior(dt, walker, miraWalker);
   if (miraIntent.amount > 0) miraWalker.faceTowards(miraIntent.direction, TURN_SPEED * dt);
   // 感情で足取りが変わる（喜んでいると軽く、沈んでいると遅い）。全力で追いかけるときは変えない
   miraInput.forward = emotionalStride(miraIntent.amount, emotion.values);
@@ -644,7 +718,12 @@ renderer.setAnimationLoop((time) => {
   walker.orientation(player.quaternion);
   placeMira();
   // ミラはプレイヤーの顔のあたりを見る（正面から離れすぎていれば前を見る）
-  mira.gazeTarget = playerHead.copy(walker.position).addScaledVector(walker.up, PLAYER_EYE_HEIGHT);
+  // 気になる物を見に行っているあいだは、その物を見る
+  const spot = !working && behavior === 'inspect' ? curiosity.current : null;
+  mira.gazeTarget = spot
+    ? playerHead.copy(spot.position).addScaledVector(miraWalker.up, SPOT_EYE_HEIGHT)
+    : playerHead.copy(walker.position).addScaledVector(walker.up, PLAYER_EYE_HEIGHT);
+  mira.sitting = !working && behavior === 'sit';
   emotion.update(dt);
   moodFace(emotion.values, mira.mood);
   mira.update(dt, miraInput.forward, projector.noise, projector.visibility);

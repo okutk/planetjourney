@@ -12,9 +12,11 @@ import {
 import type { VRM, VRMHumanBoneName } from '@pixiv/three-vrm';
 import {
   DEFAULT_IDLE_CONFIG,
+  DEFAULT_SIT_CONFIG,
   DEFAULT_WALK_CONFIG,
   createPose,
   idlePose,
+  sitPose,
   walkPose,
   type Pose,
 } from '../core/gait';
@@ -28,18 +30,24 @@ import {
 export interface MotionClips {
   idle: AnimationClip;
   walk: AnimationClip;
+  /** 座る（なければ座らず、待機のまま） */
+  sit?: AnimationClip;
 }
 
 /** 待機と歩きの混ざり方が切り替わる速さ（大きいほどすぐ切り替わる） */
 const BLEND_RATE = 8;
 /** 歩きクリップの再生速度の下限（歩く量 0 のとき）。全力で 1 倍 */
 const MIN_WALK_TIME_SCALE = 0.5;
+/** 座る・立つの切り替えの速さ（歩きとの比） */
+const SIT_BLEND_SCALE = 0.35;
 
 export class MiraMotion {
   private readonly mixer: AnimationMixer;
   private readonly idle: AnimationAction;
   private readonly walk: AnimationAction;
+  private readonly sit: AnimationAction | null;
   private walkWeight = 0;
+  private sitWeight = 0;
 
   constructor(
     private readonly root: Object3D,
@@ -48,15 +56,20 @@ export class MiraMotion {
     this.mixer = new AnimationMixer(root);
     this.idle = this.mixer.clipAction(clips.idle).setLoop(LoopRepeat, Infinity);
     this.walk = this.mixer.clipAction(clips.walk).setLoop(LoopRepeat, Infinity);
+    this.sit = clips.sit ? this.mixer.clipAction(clips.sit).setLoop(LoopRepeat, Infinity) : null;
     this.idle.play();
     this.walk.play();
+    this.sit?.play();
     this.apply();
   }
 
-  /** 毎フレーム呼ぶ。walkAmount は歩く量（0 で止まっている、1 で全力） */
-  update(dt: number, walkAmount: number): void {
+  /** 毎フレーム呼ぶ。walkAmount は歩く量（0 で止まっている、1 で全力）、sitting は座っているか */
+  update(dt: number, walkAmount: number, sitting = false): void {
     const target = Math.min(1, Math.max(0, walkAmount));
-    this.walkWeight += (target - this.walkWeight) * (1 - Math.exp(-BLEND_RATE * dt));
+    const blend = 1 - Math.exp(-BLEND_RATE * dt);
+    this.walkWeight += (target - this.walkWeight) * blend;
+    // 座る・立つは歩きより遅く切り替える（腰がゆっくり沈む）
+    this.sitWeight += ((sitting && this.sit ? 1 : 0) - this.sitWeight) * blend * SIT_BLEND_SCALE;
     // 脚の周期を移動の速さに合わせる（足が床を滑って見えないように）。ゆっくりでも止まって見えない下限を置く
     this.walk.setEffectiveTimeScale(MIN_WALK_TIME_SCALE + (1 - MIN_WALK_TIME_SCALE) * target);
     this.apply();
@@ -64,8 +77,10 @@ export class MiraMotion {
   }
 
   private apply(): void {
-    this.walk.setEffectiveWeight(this.walkWeight);
-    this.idle.setEffectiveWeight(1 - this.walkWeight);
+    const standing = 1 - this.sitWeight;
+    this.walk.setEffectiveWeight(this.walkWeight * standing);
+    this.idle.setEffectiveWeight((1 - this.walkWeight) * standing);
+    this.sit?.setEffectiveWeight(this.sitWeight);
   }
 
   dispose(): void {
@@ -132,7 +147,7 @@ function buildClip(
     const values = new Float32Array((SAMPLES + 1) * 3);
     poses.forEach((pose, i) => {
       values[i * 3] = rest[0];
-      values[i * 3 + 1] = rest[1] + pose.hipsBob;
+      values[i * 3 + 1] = rest[1] * (1 - pose.hipsDrop) + pose.hipsBob;
       values[i * 3 + 2] = rest[2];
     });
     tracks.push(new VectorKeyframeTrack(`${hips.name}.position`, times, values));
@@ -148,6 +163,9 @@ export function buildProceduralClips(vrm: VRM): MotionClips {
     ),
     walk: buildClip('walk', DEFAULT_WALK_CONFIG.period, vrm, (phase, out) =>
       walkPose(phase, DEFAULT_WALK_CONFIG, out),
+    ),
+    sit: buildClip('sit', DEFAULT_SIT_CONFIG.period, vrm, (phase, out) =>
+      sitPose(phase * DEFAULT_SIT_CONFIG.period, DEFAULT_SIT_CONFIG, out),
     ),
   };
 }

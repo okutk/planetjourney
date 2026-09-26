@@ -1031,5 +1031,78 @@
       "窓の外、ずっと見ていられるね。……データでは、ただの座標だったのに。"
     ],
     "cooldown": 30
+  },
+  {
+    "id": "inspect.default",
+    "concept": "inspect",
+    "criteria": [
+      {
+        "fact": "spot",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "{spot}、気になる……。ちょっと見てくるね。",
+      "あ、{spot}。近くで見てもいい？"
+    ],
+    "cooldown": 20
+  },
+  {
+    "id": "inspect.curious",
+    "concept": "inspect",
+    "criteria": [
+      {
+        "fact": "spot",
+        "op": "exists"
+      },
+      {
+        "fact": "mood",
+        "op": "eq",
+        "value": "curious"
+      }
+    ],
+    "lines": [
+      "{spot}！ データで見たのと、ちょっと違う気がする！"
+    ],
+    "expression": "surprised",
+    "cooldown": 20
+  },
+  {
+    "id": "sit.default",
+    "concept": "sit",
+    "criteria": [],
+    "lines": [
+      "……ちょっと、座ってもいい？",
+      "ここで待ってるね。"
+    ],
+    "expression": "relaxed",
+    "cooldown": 60
+  },
+  {
+    "id": "sit.close",
+    "concept": "sit",
+    "criteria": [
+      {
+        "fact": "trust",
+        "op": "gte",
+        "value": 40
+      }
+    ],
+    "lines": [
+      "となりに座るね。……座ってるふり、だけど。"
+    ],
+    "expression": "happy",
+    "cooldown": 60
+  },
+  {
+    "id": "hide.default",
+    "concept": "hide",
+    "criteria": [],
+    "lines": [
+      "……なんだか、こわい。そばにいさせて。",
+      "後ろにいても、いい？"
+    ],
+    "expression": "sad",
+    "cooldown": 60
   }
 ]

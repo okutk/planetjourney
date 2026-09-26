@@ -15,6 +15,8 @@ export interface Pose {
   headPitch: number;
   /** 腰の上下（モデルの単位。歩くときの弾み） */
   hipsBob: number;
+  /** 腰を落とす割合（0 で立っている、1 で腰が床の高さ）。座るときに使う */
+  hipsDrop: number;
   leftUpperLegPitch: number;
   rightUpperLegPitch: number;
   leftKnee: number;
@@ -33,6 +35,7 @@ export function createPose(): Pose {
     chestPitch: 0,
     headPitch: 0,
     hipsBob: 0,
+    hipsDrop: 0,
     leftUpperLegPitch: 0,
     rightUpperLegPitch: 0,
     leftKnee: 0,
@@ -122,6 +125,7 @@ export function walkPose(phase: number, config: WalkConfig, out: Pose): Pose {
   out.rightElbow = config.elbowBend;
   // 腰は足が着くたび（1 周期に 2 回）に沈む
   out.hipsBob = -config.bob * (1 - Math.cos(2 * TWO_PI * left)) / 2;
+  out.hipsDrop = 0;
   out.spinePitch = config.lean;
   out.chestPitch = 0;
   out.headPitch = 0;
@@ -143,6 +147,62 @@ export function idlePose(time: number, config: IdleConfig, out: Pose): Pose {
   out.leftUpperArmPitch = 0;
   out.rightUpperArmPitch = 0;
   out.hipsBob = 0;
+  out.hipsDrop = 0;
   out.spinePitch = 0;
+  return out;
+}
+
+/** 座る（膝を抱えて地面に座る）姿勢の設定値 */
+export interface SitConfig {
+  /** 1 呼吸にかかる秒数 */
+  period: number;
+  /** 胸の反りの幅 */
+  breath: number;
+  /** 腰を落とす割合 */
+  hipsDrop: number;
+  /** 上半身の前傾（膝の方へ） */
+  lean: number;
+  /** 太ももを前へ上げる角度 */
+  thigh: number;
+  /** 膝の曲げ */
+  knee: number;
+  /** 腕を前へ出す角度（膝を抱える） */
+  armForward: number;
+  armDown: number;
+  elbowBend: number;
+  /** 頭がゆっくり揺れる幅 */
+  headSway: number;
+}
+
+export const DEFAULT_SIT_CONFIG: Readonly<SitConfig> = {
+  period: 4.2,
+  breath: 0.03,
+  hipsDrop: 0.8,
+  lean: 0.35,
+  thigh: 2,
+  knee: 2.2,
+  armForward: 0.9,
+  armDown: 1.3,
+  elbowBend: 0.9,
+  headSway: 0.04,
+};
+
+/** 時刻 time（秒）の座った姿勢（膝を抱えて、ゆっくり呼吸する）を out に書く。 */
+export function sitPose(time: number, config: SitConfig, out: Pose): Pose {
+  const breath = (1 - Math.cos((TWO_PI * time) / config.period)) / 2;
+  out.hipsBob = 0;
+  out.hipsDrop = config.hipsDrop;
+  out.spinePitch = config.lean;
+  out.chestPitch = -config.breath * breath;
+  out.headPitch = config.headSway * breath;
+  out.leftUpperLegPitch = config.thigh;
+  out.rightUpperLegPitch = config.thigh;
+  out.leftKnee = config.knee;
+  out.rightKnee = config.knee;
+  out.leftUpperArmPitch = config.armForward;
+  out.rightUpperArmPitch = config.armForward;
+  out.armDown = config.armDown;
+  out.leftElbow = config.elbowBend;
+  out.rightElbow = config.elbowBend;
   return out;
 }
