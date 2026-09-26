@@ -22,6 +22,12 @@ export const DEFAULT_PROJECTION_CONFIG: Readonly<ProjectionConfig> = {
   fadeDuration: 0.35,
 };
 
+/**
+ * ミラに仕掛けの作業を頼んでいるあいだ、プレイヤーが仕掛けからこれより離れると作業が止まる距離。
+ * 投影範囲（腕輪とミラの距離）より少し短くして、ミラが映し直される前に止める
+ */
+export const TASK_RANGE = DEFAULT_PROJECTION_CONFIG.range - 1;
+
 /** 腕輪からの距離に応じたノイズの強さ（0〜1）。 */
 export function projectionNoise(distance: number, config: ProjectionConfig): number {
   // noiseFrom が range 以上の設定でも 0 除算で NaN にならないよう、範囲の内外だけで決める

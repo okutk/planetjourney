@@ -1,7 +1,7 @@
 import { Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_WALKER_CONFIG, SphericalWalker, type WalkInput } from '../core/walker';
-import { DEFAULT_FOLLOW_CONFIG, followIntent, type FollowIntent } from './companion';
+import { DEFAULT_FOLLOW_CONFIG, followIntent, seekIntent, type FollowIntent } from './companion';
 
 const RADIUS = 5;
 const DT = 1 / 60;
@@ -79,5 +79,26 @@ describe('followIntent', () => {
     // 最後はプレイヤーの後ろ側にいる
     const toMira = mira.position.clone().sub(player.position);
     expect(toMira.dot(player.forward)).toBeLessThan(0);
+  });
+});
+
+describe('seekIntent', () => {
+  it('目標へ地表に沿って歩き、着いたら止まる', () => {
+    const mira = createWalker(new Vector3(0, 1, 0));
+    const target = new Vector3(0, 1, 0.5).normalize().multiplyScalar(RADIUS);
+    const intent: FollowIntent = { direction: new Vector3(), amount: 0 };
+    const input: WalkInput = { forward: 0, right: 0, jump: false };
+    let arrivedAt = Infinity;
+    for (let t = 0; t < 5; t += DT) {
+      const distance = seekIntent(mira, target, 0.5, 2, intent);
+      if (distance <= 0.5 && arrivedAt === Infinity) arrivedAt = t;
+      expect(intent.direction.dot(mira.up)).toBeCloseTo(0, 6);
+      if (intent.amount > 0) mira.faceTowards(intent.direction, 1);
+      input.forward = intent.amount;
+      mira.step(input, DT);
+    }
+    expect(arrivedAt).toBeLessThan(2);
+    expect(mira.position.distanceTo(target)).toBeLessThan(0.6);
+    expect(intent.amount).toBe(0);
   });
 });

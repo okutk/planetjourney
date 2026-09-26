@@ -154,7 +154,7 @@ describe('src/data/dialogue.json', () => {
   it('初めて着いたときは、必ず初回のセリフになる（同点で乱数に回らない）', () => {
     for (let seed = 0; seed < 50; seed++) {
       const selector = new DialogueSelector(rules, createRandom(seed));
-      expect(selector.select('greet', { visits: 1, planet: 'はじまりの星' }, 0)?.ruleId).toBe('greet.first');
+      expect(selector.select('greet', { visits: 1, planetId: 'origin', planet: 'はじまりの星' }, 0)?.ruleId).toBe('greet.first');
     }
   });
 

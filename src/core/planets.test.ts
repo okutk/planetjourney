@@ -1,11 +1,10 @@
 import { Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import planetsData from '../data/planets.json';
-import { parsePlanets } from './planets';
+import { parsePlanets, POD_ANGLE } from './planets';
 import { behindOn } from './sphere';
 import { Terrain } from './terrain';
 
-const POD_ANGLE = 0.42; // main.ts と同じ（ボタンの出る距離 × 1.5 ÷ 半径 5）
 const HEADING = new Vector3(0, 0, 1);
 
 describe('parsePlanets', () => {
@@ -25,6 +24,19 @@ describe('parsePlanets', () => {
     }
   });
 
+  it('どの星にも仕掛けがあり、陸の上で、出現位置から離れている', () => {
+    for (const planet of parsePlanets(planetsData)) {
+      const terrain = new Terrain(planet.terrain);
+      const spawn = new Vector3(...planet.spawn).normalize();
+      expect(planet.gimmicks.length, planet.id).toBeGreaterThanOrEqual(1);
+      for (const gimmick of planet.gimmicks) {
+        const direction = new Vector3(...gimmick.direction).normalize();
+        expect(terrain.isLand(direction), `${planet.id} の ${gimmick.id}`).toBe(true);
+        expect(direction.angleTo(spawn), `${planet.id} の ${gimmick.id} は出現位置から離す`).toBeGreaterThan(POD_ANGLE + 0.3);
+      }
+    }
+  });
+
   it('id の重複・知らないキー・行ける星がない一覧・海の設定の片方だけは例外にする', () => {
     const base = {
       id: 'a',
@@ -34,6 +46,7 @@ describe('parsePlanets', () => {
       terrain: { radius: 5, amplitude: 0.5, frequency: 1, octaves: 2, seed: 1 },
       look: { groundColor: '#7fcf8a', props: [{ kind: 'tree', count: 3, color: '#2f7a4b' }], seed: 1 },
       spawn: [0, 1, 0],
+      gimmicks: [{ id: 'g', kind: 'light', name: 'G', direction: [1, 0, 0] }],
     };
     expect(() => parsePlanets([base, { ...base }])).toThrow('重複');
     expect(() => parsePlanets([{ ...base, seed: 1 }])).toThrow('知らないキー');
@@ -46,5 +59,7 @@ describe('parsePlanets', () => {
     );
     expect(() => parsePlanets([{ ...base, look: { ...base.look, groundColor: 'green' } }])).toThrow('#rrggbb');
     expect(() => parsePlanets([{ ...base, spawn: [0, 0, 0] }])).toThrow('spawn');
+    expect(() => parsePlanets([{ ...base, gimmicks: [{ ...base.gimmicks[0], kind: 'push' }] }])).toThrow('知らない種類');
+    expect(() => parsePlanets([{ ...base, gimmicks: [base.gimmicks[0], base.gimmicks[0]] }])).toThrow('重複');
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_PROJECTION_CONFIG, Projector, projectionNoise } from './projection';
+import { DEFAULT_PROJECTION_CONFIG, Projector, projectionNoise, TASK_RANGE } from './projection';
 
 const DT = 1 / 60;
 const { range, noiseFrom, outsideGrace, fadeDuration } = DEFAULT_PROJECTION_CONFIG;
@@ -77,5 +77,12 @@ describe('Projector', () => {
     expect(projector.noise).toBe(0);
     expect(projector.reprojecting).toBe(false);
     expect(run(projector, range + 1, outsideGrace * 0.5)).toBe(0);
+  });
+});
+
+describe('TASK_RANGE', () => {
+  it('投影範囲より短く、作業中にミラが映し直される前に止まる', () => {
+    expect(TASK_RANGE).toBeGreaterThan(0);
+    expect(TASK_RANGE).toBeLessThan(DEFAULT_PROJECTION_CONFIG.range);
   });
 });
