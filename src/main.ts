@@ -24,6 +24,7 @@ import { createRandom } from './core/noise';
 import dialogueData from './data/dialogue.json';
 import { SpeechBubble } from './ui/speechBubble';
 import { DEFAULT_FOLLOW_CONFIG, followIntent, followSlot, type FollowIntent } from './ai/companion';
+import { Projector } from './ai/projection';
 import { MiraView } from './character/mira';
 import { Journey } from './core/journey';
 import { parsePlanets, type PlanetInfo } from './core/planets';
@@ -138,11 +139,16 @@ interface Stage {
   readonly spotLabel: string;
   /** この場所に入ったとき。プレイヤーとミラを出現位置に置き、会話の事実（いる場所）を更新する */
   enter(): void;
+  /** ミラをプレイヤーの斜め後ろの定位置に置き直す（投影範囲から離れすぎたとき） */
+  reprojectMira(): void;
   /** ボタンが押されたとき（暗転の先で次の場所へ移る） */
   act(): void;
 }
 
 const journey = new Journey();
+const tmpSlot = new Vector3();
+// ミラの投影範囲。プレイヤー（腕輪）から離れすぎるとノイズが走り、しばらく経つと定位置に映し直す
+const projector = new Projector();
 
 const shipWalker = new RoomWalker(roomConfig);
 const shipMira = new RoomWalker({ ...roomConfig, walkSpeed: MIRA_WALK_SPEED });
@@ -158,7 +164,10 @@ const shipStage: Stage = {
     talk.enterShip();
     // 窓（-Z 側）の方を向いて、部屋の奥に立つ
     shipWalker.placeAt(0, 1.5, new Vector3(0, 0, -1));
-    const slot = followSlot(shipWalker, DEFAULT_FOLLOW_CONFIG, new Vector3()).sub(SHIP_POSITION);
+    this.reprojectMira();
+  },
+  reprojectMira() {
+    const slot = followSlot(shipWalker, DEFAULT_FOLLOW_CONFIG, tmpSlot).sub(SHIP_POSITION);
     shipMira.placeAt(slot.x, slot.z, shipWalker.forward);
   },
   act() {
@@ -205,7 +214,10 @@ function createPlanetStage(info: PlanetInfo): PlanetStage {
       shipRoom.group.visible = false;
       talk.enterPlanet(info.name, journey.land(info.id));
       walker.placeAt(spawn, SPAWN_HEADING);
-      mira.placeAt(followSlot(walker, DEFAULT_FOLLOW_CONFIG, new Vector3()).sub(planetCenter), walker.forward);
+      this.reprojectMira();
+    },
+    reprojectMira() {
+      mira.placeAt(followSlot(walker, DEFAULT_FOLLOW_CONFIG, tmpSlot).sub(planetCenter), walker.forward);
     },
     act() {
       switchTo(shipStage);
@@ -330,6 +342,7 @@ function enterStage(next: Stage): void {
   camera.position.copy(orbit.eye(stage.walker.position, stage.walker.up, cameraGoal));
   camera.up.copy(stage.walker.up);
   // ミラは新しい場所に置いてから、髪などの揺れを落ち着かせる（移動前の位置から振り回されないように）
+  projector.reset();
   placeMira();
   mira.settle();
   greetAt = now + ARRIVE_TALK_DELAY;
@@ -418,6 +431,12 @@ renderer.setAnimationLoop((time) => {
   if (miraIntent.amount > 0) miraWalker.faceTowards(miraIntent.direction, TURN_SPEED * dt);
   miraInput.forward = miraIntent.amount;
   miraWalker.step(miraInput, dt);
+  // 投影範囲。消え切った瞬間に、腕輪のそば（定位置）へ映し直す
+  if (projector.update(walker.position.distanceTo(miraWalker.position), dt)) {
+    stage.reprojectMira();
+    placeMira();
+    mira.settle();
+  }
 
   // 調べられる物（星図の台・着陸ポッド）の近くでボタンを出し、押されたら場所を移る。
   // あいさつを待っている間は開けない（あいさつが星図のセリフに押されて抜けないように）
@@ -449,7 +468,7 @@ renderer.setAnimationLoop((time) => {
   player.position.copy(walker.position);
   walker.orientation(player.quaternion);
   placeMira();
-  mira.update(dt, miraIntent.amount);
+  mira.update(dt, miraIntent.amount, projector.noise, projector.visibility);
   updateCamera(walker, dt);
   renderer.render(scene, camera);
 
