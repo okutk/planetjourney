@@ -32,6 +32,7 @@ import { MiraView } from './character/mira';
 import { Journey } from './core/journey';
 import { ACTION_RADIUS, parsePlanets, POD_ANGLE, type PlanetInfo } from './core/planets';
 import { ARRIVE_RADIUS, MiraTask, REQUEST_RADIUS, SLOW_RADIUS } from './core/gimmick';
+import { MAX_FRAGMENT_STAGE } from './core/projector';
 import { DEFAULT_ORBIT_CAMERA_CONFIG, OrbitCamera } from './core/orbitCamera';
 import { RoomWalker } from './core/roomWalker';
 import { behindOn } from './core/sphere';
@@ -44,7 +45,7 @@ import { localStore } from './ui/localStore';
 import { PerfOverlay } from './ui/perfOverlay';
 import { StarMapPanel } from './ui/starMap';
 import { TouchControls } from './ui/touchControls';
-import { GimmickView } from './world/gimmickView';
+import { GimmickView, PICKUP_RADIUS } from './world/gimmickView';
 import { LandingPod } from './world/landingPod';
 import { PlanetView } from './world/planet';
 import { SHIP_ROOM, ShipRoomView } from './world/shipRoom';
@@ -56,6 +57,7 @@ import { WarpStreaks } from './world/warpStreaks';
 // 星の上では着陸ポッドのそばで「船に戻る」と部屋へ戻る。
 // 星には仕掛け（灯り・刻まれた石・岩のすきま）があり、近づいて「ミラに頼む」とミラが歩いていって解く。
 // ミラは腕輪の投影なので、作業のあいだプレイヤーがそばにいないと止まる（役割分担）。
+// 解いた仕掛けには星のかけらが現れ、拾って船の投影機に入れると段階が上がり、ミラの体が少しずつ硬い光になる。
 // 操作（移動はカメラから見た向き。プレイヤーは進む方向へ向き直る）
 //   タッチ: 左半分に仮想スティック、右半分のドラッグでカメラを回す（上下で見下ろす角度）、右下のボタンでジャンプ、
 //   調べられる物の近くではその上に「星図」「船に戻る」のボタン
@@ -78,6 +80,7 @@ const WARP_LINE_MARGIN = 0.6; // ワープのセリフを言い切ってから�
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
 const hud = document.querySelector<HTMLElement>('#hud')!;
+const status = document.querySelector<HTMLElement>('#status')!;
 const renderer = new WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
 
@@ -173,15 +176,15 @@ const roomConfig = {
   origin: SHIP_POSITION,
   halfWidth: SHIP_ROOM.halfWidth - BODY_RADIUS,
   halfDepth: SHIP_ROOM.halfDepth - BODY_RADIUS,
-  obstacles: [SHIP_ROOM.console],
+  obstacles: [SHIP_ROOM.console, SHIP_ROOM.projector],
 };
 
 /** 調べられる物。近づくとボタンが出て、押すと act() が呼ばれる */
 interface Interactable {
   /** 位置（ワールド座標） */
   readonly position: Vector3;
-  /** ボタンの文言 */
-  readonly label: string;
+  /** ボタンの文言（かけらの数などで変わるので関数） */
+  label(): string;
   /** この距離まで近づくとボタンが出る */
   readonly radius: number;
   /** いま調べられるか（解き終えた仕掛けなどは false） */
@@ -203,6 +206,12 @@ interface Stage {
 }
 
 const journey = new Journey();
+const playerChest = new Vector3();
+const PLAYER_CHEST_HEIGHT = 0.8; // かけらを拾う判定に使う、プレイヤーの胸の高さ
+/** 手持ちのかけらと投影機の段階の表示を更新する。変わったときだけ呼ぶ */
+function refreshStatus(): void {
+  status.textContent = `かけら ✦ ${journey.fragments}　投影機 段階 ${journey.stage}`;
+}
 const tmpSlot = new Vector3();
 // ミラの投影範囲。プレイヤー（腕輪）から離れすぎるとノイズが走り、しばらく経つと定位置に映し直す
 const projector = new Projector();
@@ -215,13 +224,30 @@ const shipStage: Stage = {
   interactables: [
     {
       position: new Vector3(SHIP_ROOM.console.x, 0, SHIP_ROOM.console.z).add(SHIP_POSITION),
-      label: '星図',
+      label: () => '星図',
       radius: ACTION_RADIUS,
       available: () => true,
       act() {
         starMap.open(journey.planet);
         touch.release();
         say(talk.openedStarMap(now), now);
+      },
+    },
+    {
+      // 投影機。かけらが足りれば段階を上げ、足りなければミラが残りの数を言う。最大まで上げたら押せない
+      position: new Vector3(SHIP_ROOM.projector.x, 0, SHIP_ROOM.projector.z).add(SHIP_POSITION),
+      label: () => `投影機を強化（かけら ${journey.fragments}/${journey.nextCost ?? 0}）`,
+      radius: ACTION_RADIUS,
+      available: () => journey.fragmentsNeeded !== null,
+      act() {
+        const need = journey.fragmentsNeeded ?? 0;
+        if (journey.upgradeProjector()) {
+          mira.setSolidity(journey.stage / MAX_FRAGMENT_STAGE);
+          refreshStatus();
+          say(talk.upgraded(now, journey.stage), now);
+        } else {
+          say(talk.upgradeShort(now, need), now);
+        }
       },
     },
   ],
@@ -261,7 +287,10 @@ function createPlanetStage(info: PlanetInfo): PlanetStage {
   scene.add(view.group, pod.group);
   const gimmicks = info.gimmicks.map((def) => {
     const gimmickView = new GimmickView(terrain, def);
-    gimmickView.setSolved(journey.isSolved(info.id, def.id));
+    const solved = journey.isSolved(info.id, def.id);
+    gimmickView.setSolved(solved);
+    // 解いたのにまだ拾っていないかけらは、降り直したときも出しておく
+    gimmickView.setFragment(solved && !journey.isCollected(info.id, def.id));
     scene.add(gimmickView.group);
     return { def, view: gimmickView };
   });
@@ -282,14 +311,14 @@ function createPlanetStage(info: PlanetInfo): PlanetStage {
     interactables: [
       {
         position: pod.position,
-        label: '船に戻る',
+        label: () => '船に戻る',
         radius: ACTION_RADIUS,
         available: () => task === null, // ミラが作業しているあいだは戻れない（作業を置き去りにしないように）
         act: () => switchTo(shipStage),
       },
       ...gimmicks.map(({ def, view: gimmickView }) => ({
         position: gimmickView.position,
-        label: 'ミラに頼む',
+        label: () => 'ミラに頼む',
         radius: REQUEST_RADIUS,
         available: () => task === null && !journey.isSolved(info.id, def.id),
         act: () => {
@@ -311,6 +340,20 @@ function createPlanetStage(info: PlanetInfo): PlanetStage {
       mira.placeAt(followSlot(walker, DEFAULT_FOLLOW_CONFIG, tmpSlot).sub(planetCenter), walker.forward);
     },
     update(dt) {
+      // かけら: 浮かせて回し、プレイヤーが触れたら拾う（かけらは浮いているので、足元ではなく胸の高さから測る）
+      for (const { def, view: gimmickView } of gimmicks) {
+        gimmickView.update(dt);
+        if (!gimmickView.hasFragment) continue;
+        playerChest.copy(walker.position).addScaledVector(walker.up, PLAYER_CHEST_HEIGHT);
+        if (gimmickView.shouldPickUp(playerChest.distanceTo(gimmickView.fragmentPosition), PICKUP_RADIUS)) {
+          gimmickView.setFragment(false);
+          if (journey.collectFragment(info.id, def.id)) {
+            refreshStatus();
+            voice.stop();
+            say(talk.collectedFragment(now, journey.collectedCount, journey.fragments), now);
+          }
+        }
+      }
       if (!task) return false;
       const { run, view: gimmickView } = task;
       // 作業中のミラは仕掛けへ歩いていき、着いたら仕掛けの方を向いて作業する
@@ -322,6 +365,7 @@ function createPlanetStage(info: PlanetInfo): PlanetStage {
       if (event === 'done') {
         journey.solve(info.id, run.gimmick.id);
         gimmickView.setSolved(true);
+        gimmickView.setFragment(true);
         voice.stop();
         say(talk.finishTask(now, journey.solvedCount), now);
       } else if (event === 'cancelled') {
@@ -503,6 +547,8 @@ const starMap = new StarMapPanel(
   },
   () => starMap.close(),
 );
+refreshStatus();
+mira.setSolidity(journey.stage / MAX_FRAGMENT_STAGE);
 enterStage(shipStage);
 
 const input: WalkInput = { forward: 0, right: 0, jump: false };
@@ -571,7 +617,7 @@ renderer.setAnimationLoop((time) => {
       }
     }
   }
-  touch.setAction(near?.label ?? null);
+  touch.setAction(near ? near.label() : null);
   const action = touch.consumeAction() || actionRequested;
   actionRequested = false;
   if (near && action) near.act();

@@ -93,6 +93,28 @@ export class TalkDirector {
     return this.say('taskDone', now);
   }
 
+  /** 星のかけらを拾ったとき。collected は拾った通算の数（セリフの「n 個目」）、fragments は手持ちの数。 */
+  collectedFragment(now: number, collected: number, fragments: number): DialogueLine | null {
+    this.facts.collected = collected;
+    this.facts.fragments = fragments;
+    this.interrupt();
+    return this.say('fragment', now);
+  }
+
+  /** 投影機の段階が上がったとき。stage は上がったあとの段階。 */
+  upgraded(now: number, stage: number): DialogueLine | null {
+    this.facts.stage = stage;
+    this.interrupt();
+    return this.say('upgrade', now);
+  }
+
+  /** 投影機を強化しようとしたが、かけらが足りないとき。need は足りない数。 */
+  upgradeShort(now: number, need: number): DialogueLine | null {
+    this.facts.need = need;
+    this.interrupt();
+    return this.say('upgradeShort', now);
+  }
+
   /** プレイヤーが離れて投影が届かず、作業が止まったとき。頼んだ直後でも打ち切って話す。 */
   cancelTask(now: number): DialogueLine | null {
     this.emotion?.feel('cancel');
