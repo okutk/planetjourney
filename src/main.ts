@@ -24,7 +24,7 @@ import { createRandom } from './core/noise';
 import dialogueData from './data/dialogue.json';
 import { SpeechBubble } from './ui/speechBubble';
 import { DEFAULT_FOLLOW_CONFIG, followIntent, followSlot, type FollowIntent } from './ai/companion';
-import { MiraPlaceholder } from './character/miraPlaceholder';
+import { MiraView } from './character/mira';
 import { Journey } from './core/journey';
 import { parsePlanets } from './core/planets';
 import { DEFAULT_ORBIT_CAMERA_CONFIG, OrbitCamera } from './core/orbitCamera';
@@ -126,8 +126,8 @@ function speechDuration(text: string): number {
 }
 const talk = new TalkDirector(new DialogueSelector(parseRules(dialogueData), createRandom(Date.now())), speechDuration);
 
-// ミラ（仮の見た目）。プレイヤーの斜め後ろの定位置を目指して、プレイヤーと同じ歩き方でついてくる
-const mira = new MiraPlaceholder();
+// ミラ。VRM を読み込むまでは仮の見た目。プレイヤーの斜め後ろの定位置を目指して、プレイヤーと同じ歩き方でついてくる
+const mira = new MiraView();
 scene.add(mira.group);
 const miraIntent: FollowIntent = { direction: new Vector3(), amount: 0 };
 const miraInput: WalkInput = { forward: 0, right: 0, jump: false };
@@ -314,7 +314,14 @@ function enterStage(next: Stage): void {
   orbit.reset(stage.walker.forward, stage.walker.up);
   camera.position.copy(orbit.eye(stage.walker.position, stage.walker.up, cameraGoal));
   camera.up.copy(stage.walker.up);
+  // ミラは新しい場所に置いてから、髪などの揺れを落ち着かせる（移動前の位置から振り回されないように）
+  placeMira();
+  mira.settle();
   greetAt = now + ARRIVE_TALK_DELAY;
+}
+function placeMira(): void {
+  mira.group.position.copy(stage.mira.position);
+  stage.mira.orientation(mira.group.quaternion);
 }
 /** 暗転して next へ移る。すでに暗転中なら移れず false。 */
 function switchTo(next: Stage): boolean {
@@ -414,13 +421,13 @@ renderer.setAnimationLoop((time) => {
 
   player.position.copy(walker.position);
   walker.orientation(player.quaternion);
-  mira.group.position.copy(miraWalker.position);
-  miraWalker.orientation(mira.group.quaternion);
+  placeMira();
+  mira.update(dt);
   updateCamera(walker, dt);
   renderer.render(scene, camera);
 
   // 吹き出しはミラの頭の上に出す（画面の外やカメラの後ろなら隠す）
-  bubbleAnchor.copy(miraWalker.position).addScaledVector(miraWalker.up, 1.1).project(camera);
+  bubbleAnchor.copy(miraWalker.position).addScaledVector(miraWalker.up, mira.height).project(camera);
   bubble.update(
     now,
     ((bubbleAnchor.x + 1) / 2) * canvas.clientWidth,
