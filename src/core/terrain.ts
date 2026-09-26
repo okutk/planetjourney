@@ -12,6 +12,11 @@ export interface TerrainConfig {
   /** 重ねるノイズの数 */
   octaves: number;
   seed: number;
+  /**
+   * 海面（ノイズの値。-1〜1）。指定すると、この値より低い所は平らな海（基準の半径）になり、
+   * 高い所だけが島として盛り上がる。省略すると全体が起伏のある陸になる
+   */
+  seaLevel?: number;
 }
 
 /**
@@ -23,9 +28,21 @@ export class Terrain {
 
   /** 単位ベクトル direction の方向の、地表の半径。 */
   radiusAt(direction: Vector3): number {
-    const { radius, amplitude, frequency, octaves, seed } = this.config;
-    const n = fbm3(direction.x * frequency, direction.y * frequency, direction.z * frequency, octaves, seed);
-    return radius + n * amplitude;
+    const { radius, amplitude, seaLevel } = this.config;
+    const n = this.noiseAt(direction);
+    if (seaLevel === undefined) return radius + n * amplitude;
+    return radius + Math.max(0, n - seaLevel) * amplitude;
+  }
+
+  /** その方向が陸か（海のない星では常に真）。配置物や出現位置は陸にだけ置く。 */
+  isLand(direction: Vector3): boolean {
+    const { seaLevel } = this.config;
+    return seaLevel === undefined || this.noiseAt(direction) > seaLevel;
+  }
+
+  private noiseAt(direction: Vector3): number {
+    const { frequency, octaves, seed } = this.config;
+    return fbm3(direction.x * frequency, direction.y * frequency, direction.z * frequency, octaves, seed);
   }
 }
 

@@ -26,9 +26,10 @@ import { SpeechBubble } from './ui/speechBubble';
 import { DEFAULT_FOLLOW_CONFIG, followIntent, followSlot, type FollowIntent } from './ai/companion';
 import { MiraView } from './character/mira';
 import { Journey } from './core/journey';
-import { parsePlanets } from './core/planets';
+import { parsePlanets, type PlanetInfo } from './core/planets';
 import { DEFAULT_ORBIT_CAMERA_CONFIG, OrbitCamera } from './core/orbitCamera';
 import { RoomWalker } from './core/roomWalker';
+import { behindOn } from './core/sphere';
 import { Terrain } from './core/terrain';
 import { DEFAULT_WALKER_CONFIG, SphericalWalker, type Walker, type WalkInput } from './core/walker';
 import { DEFAULT_WARP_CONFIG, WarpSequence } from './core/warp';
@@ -42,8 +43,9 @@ import { PlanetView } from './world/planet';
 import { SHIP_ROOM, ShipRoomView } from './world/shipRoom';
 import { WarpStreaks } from './world/warpStreaks';
 
-// M3: 船の部屋（拠点）と「はじまりの星」を行き来する。
-// 船の部屋は星のそばに浮かんでいて、窓から星が見える。星図の台に近づいて「星図」を開き、星を選ぶとワープして降りる。
+// M3: 船の部屋（拠点）と 3 つの星を行き来する。星の定義（地形・見た目・出現位置）は src/data/planets.json。
+// 船の部屋は最後に降りた星のそばに浮かんでいて、窓から星が見える。星図の台に近づいて「星図」を開き、
+// 星を選ぶとワープして降りる（星の見た目は降りるたびに作り、前の星は捨てる）。
 // 星の上では着陸ポッドのそばで「船に戻る」と部屋へ戻る。
 // 操作（移動はカメラから見た向き。プレイヤーは進む方向へ向き直る）
 //   タッチ: 左半分に仮想スティック、右半分のドラッグでカメラを回す（上下で見下ろす角度）、右下のボタンでジャンプ、
@@ -53,8 +55,7 @@ import { WarpStreaks } from './world/warpStreaks';
 // シーンはページと同じ寿命なので、後片付けはページの破棄（開発時はフルリロード）に任せる。
 
 const PLANETS = parsePlanets(planetsData);
-const ORIGIN = PLANETS[0]; // いまはこの星だけに降りられる（星を増やすのは次のテーマ）
-const PLANET_RADIUS = 5;
+const PLANET_DETAIL = 16; // 地表メッシュの細かさ
 const SHIP_POSITION = new Vector3(0, -1.5, 20); // 船の部屋の床の中心。窓（-Z 側）から星が見える距離
 const MAX_PIXEL_RATIO = 2; // スマホで描画負荷が跳ね上がらないよう上限を設ける
 const MAX_DT = 1 / 30; // タブ復帰などで dt が跳ねても地面を突き抜けないよう上限を設ける
@@ -82,26 +83,13 @@ const sun = new DirectionalLight('#fff2d6', 2.2);
 sun.position.set(8, 10, 6);
 scene.add(sun);
 
-// 「はじまりの星」。地形は歩く処理と見た目で同じものを使う
+// 星はいつも原点に置く（船の部屋はそのそばに浮かぶ）
 const planetCenter = new Vector3();
-const SPAWN_DIRECTION = new Vector3(0, 1, 0);
-// 着陸ポッドは出現位置の少し後ろ（-Z 側）。降りた直後は目の前ではなく、振り返ると見える。
-// 降りた瞬間に「船に戻る」が出ないよう、ボタンの出る距離より確実に離す（地形の起伏があっても届かない角度）
-const POD_ANGLE = (ACTION_RADIUS * 1.5) / PLANET_RADIUS;
-const POD_DIRECTION = new Vector3(0, Math.cos(POD_ANGLE), -Math.sin(POD_ANGLE));
-const terrain = new Terrain({ radius: PLANET_RADIUS, amplitude: 0.5, frequency: 1.3, octaves: 3, seed: 1 });
-const planet = new PlanetView(terrain, {
-  detail: 16,
-  groundColor: '#7fcf8a',
-  treeCount: 28,
-  rockCount: 18,
-  seed: 2,
-  spawn: SPAWN_DIRECTION,
-  spawnClearance: POD_ANGLE + 0.2, // ポッドのまわりにも木や岩を置かない
-});
-scene.add(planet.group);
-const pod = new LandingPod(terrain, POD_DIRECTION);
-scene.add(pod.group);
+const SPAWN_HEADING = new Vector3(0, 0, 1); // 降りたときに向く方向（地表に沿うよう補正する）
+// 着陸ポッドは出現位置の少し後ろ。降りた直後は目の前ではなく、振り返ると見える。
+// 降りた瞬間に「船に戻る」が出ないよう、ボタンの出る距離より確実に離す（地形の起伏があっても届かない角度。
+// 半径 5 の星を基準にした角度なので、大きい星ではもう少し離れる）
+const POD_ANGLE = (ACTION_RADIUS * 1.5) / 5;
 
 // 船の部屋。星のそばに浮かべ、星の上にいるあいだは隠す
 const shipRoom = new ShipRoomView();
@@ -132,13 +120,7 @@ scene.add(mira.group);
 const miraIntent: FollowIntent = { direction: new Vector3(), amount: 0 };
 const miraInput: WalkInput = { forward: 0, right: 0, jump: false };
 
-// 場所ごとの歩き手。星は球面重力、船の部屋は平らな床
-const sphericalConfig = {
-  ...DEFAULT_WALKER_CONFIG,
-  center: planetCenter,
-  planetRadius: PLANET_RADIUS,
-  surfaceRadius: (up: Vector3) => terrain.radiusAt(up),
-};
+// 場所ごとの歩き手。星は球面重力（星ごとに作る）、船の部屋は平らな床
 const roomConfig = {
   ...DEFAULT_WALKER_CONFIG,
   origin: SHIP_POSITION,
@@ -186,25 +168,58 @@ const shipStage: Stage = {
   },
 };
 
-const planetWalker = new SphericalWalker(sphericalConfig);
-const planetMira = new SphericalWalker({ ...sphericalConfig, walkSpeed: MIRA_WALK_SPEED });
-const planetStage: Stage = {
-  walker: planetWalker,
-  mira: planetMira,
-  spot: pod.position,
-  spotLabel: '船に戻る',
-  enter() {
-    hud.textContent = ORIGIN.name;
-    shipRoom.group.visible = false;
-    talk.enterPlanet(ORIGIN.name, journey.land(ORIGIN.id));
-    planetWalker.placeAt(SPAWN_DIRECTION, new Vector3(0, 0, 1));
-    const slot = followSlot(planetWalker, DEFAULT_FOLLOW_CONFIG, new Vector3()).sub(planetCenter);
-    planetMira.placeAt(slot, planetWalker.forward);
-  },
-  act() {
-    switchTo(shipStage);
-  },
-};
+/** 星の場所。見た目・地形・歩き手をひとまとめにし、次の星へ移るときに dispose() する */
+interface PlanetStage extends Stage {
+  readonly info: PlanetInfo;
+  dispose(): void;
+}
+
+/** 星を作る。地形は歩く処理と見た目で同じものを使う */
+function createPlanetStage(info: PlanetInfo): PlanetStage {
+  const terrain = new Terrain(info.terrain);
+  const spawn = new Vector3(...info.spawn).normalize();
+  const view = new PlanetView(terrain, {
+    ...info.look,
+    detail: PLANET_DETAIL,
+    spawn,
+    spawnClearance: POD_ANGLE + 0.2, // ポッドのまわりにも配置物を置かない
+  });
+  const pod = new LandingPod(terrain, behindOn(spawn, SPAWN_HEADING, POD_ANGLE));
+  scene.add(view.group, pod.group);
+  const config = {
+    ...DEFAULT_WALKER_CONFIG,
+    center: planetCenter,
+    planetRadius: info.terrain.radius,
+    surfaceRadius: (up: Vector3) => terrain.radiusAt(up),
+  };
+  const walker = new SphericalWalker(config);
+  const mira = new SphericalWalker({ ...config, walkSpeed: MIRA_WALK_SPEED });
+  return {
+    info,
+    walker,
+    mira,
+    spot: pod.position,
+    spotLabel: '船に戻る',
+    enter() {
+      hud.textContent = info.name;
+      shipRoom.group.visible = false;
+      talk.enterPlanet(info.name, journey.land(info.id));
+      walker.placeAt(spawn, SPAWN_HEADING);
+      mira.placeAt(followSlot(walker, DEFAULT_FOLLOW_CONFIG, new Vector3()).sub(planetCenter), walker.forward);
+    },
+    act() {
+      switchTo(shipStage);
+    },
+    dispose() {
+      view.dispose();
+      pod.dispose();
+    },
+  };
+}
+
+// 船の窓から見える星。最初は一覧の先頭の星で、ワープするたびに行き先の星に入れ替える
+let planetStage = createPlanetStage(PLANETS[0]);
+let destination: PlanetInfo | null = null; // ワープ中の行き先
 
 scene.add(createStarField(800, 120));
 
@@ -327,6 +342,15 @@ function placeMira(): void {
 function switchTo(next: Stage): boolean {
   return fader.run(() => enterStage(next));
 }
+/** 暗転の先で星を作り直して降りる。前の星の見た目は捨てる（同じ星でも、降り直すので作り直す）。 */
+function warpTo(info: PlanetInfo | null): boolean {
+  if (!info) return false;
+  return fader.run(() => {
+    planetStage.dispose();
+    planetStage = createPlanetStage(info);
+    enterStage(planetStage);
+  });
+}
 
 // 星図とワープ。星図で星を選ぶと、流れる星が強まり、暗転の先で星に降りる
 const warp = new WarpSequence({ ...DEFAULT_WARP_CONFIG, jump: FADE_SECONDS });
@@ -338,6 +362,7 @@ const starMap = new StarMapPanel(
   PLANETS,
   (planet) => {
     starMap.close();
+    destination = planet;
     // ワープはプレイヤーが決めた行動なので、星図のセリフの途中でも打ち切って話す。
     // セリフを言い切ってから暗転するよう、流れる星の時間をセリフの長さまで延ばす
     talk.interrupt();
@@ -394,15 +419,17 @@ renderer.setAnimationLoop((time) => {
   miraInput.forward = miraIntent.amount;
   miraWalker.step(miraInput, dt);
 
-  // 調べられる物（星図の台・着陸ポッド）の近くでボタンを出し、押されたら場所を移る
-  const nearSpot = !fader.busy && !paused && walker.position.distanceTo(stage.spot) < ACTION_RADIUS;
+  // 調べられる物（星図の台・着陸ポッド）の近くでボタンを出し、押されたら場所を移る。
+  // あいさつを待っている間は開けない（あいさつが星図のセリフに押されて抜けないように）
+  const nearSpot =
+    !fader.busy && !paused && greetAt === Infinity && walker.position.distanceTo(stage.spot) < ACTION_RADIUS;
   touch.setAction(nearSpot ? stage.spotLabel : null);
   const action = touch.consumeAction() || actionRequested;
   actionRequested = false;
   if (nearSpot && action) stage.act();
 
-  // ワープ: 流れる星を進め、暗転に入る瞬間に星へ降りる（暗転中は移れないが、星図は暗転中に開けないので起きないはず）
-  if (warp.update(dt) && !switchTo(planetStage)) console.warn('ワープ先へ移れなかった（暗転中）');
+  // ワープ: 流れる星を進め、暗転に入る瞬間に行き先の星へ降りる（暗転中は移れないが、星図は暗転中に開けないので起きないはず）
+  if (warp.update(dt) && !warpTo(destination)) console.warn('ワープ先へ移れなかった（暗転中）');
   streaks.update(dt, warp.intensity);
 
   // 会話: 場所に入ったとき・ジャンプしたとき・しばらく放っておかれたとき。
