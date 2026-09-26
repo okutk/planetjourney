@@ -120,6 +120,10 @@
       {
         "fact": "planet",
         "op": "missing"
+      },
+      {
+        "fact": "playedBefore",
+        "op": "missing"
       }
     ],
     "lines": [
@@ -127,6 +131,153 @@
     ],
     "once": true,
     "expression": "happy"
+  },
+  {
+    "id": "board.again",
+    "concept": "board",
+    "criteria": [
+      {
+        "fact": "place",
+        "op": "eq",
+        "value": "ship"
+      },
+      {
+        "fact": "planet",
+        "op": "missing"
+      },
+      {
+        "fact": "playedBefore",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "また会えたね。今日は、どの星へ行こうか？",
+      "おかえり。……船の中で、ずっと窓の外を見てた。"
+    ],
+    "expression": "happy"
+  },
+  {
+    "id": "board.away",
+    "concept": "board",
+    "criteria": [
+      {
+        "fact": "place",
+        "op": "eq",
+        "value": "ship"
+      },
+      {
+        "fact": "planet",
+        "op": "missing"
+      },
+      {
+        "fact": "playedBefore",
+        "op": "exists"
+      },
+      {
+        "fact": "daysAway",
+        "op": "gte",
+        "value": 1
+      },
+      {
+        "fact": "daysAway",
+        "op": "lt",
+        "value": 7
+      }
+    ],
+    "lines": [
+      "{daysAway}日ぶりだね。おかえり。",
+      "{daysAway}日ぶり。……数えてたわけじゃ、ないよ？"
+    ],
+    "expression": "happy"
+  },
+  {
+    "id": "board.longAway",
+    "concept": "board",
+    "criteria": [
+      {
+        "fact": "place",
+        "op": "eq",
+        "value": "ship"
+      },
+      {
+        "fact": "planet",
+        "op": "missing"
+      },
+      {
+        "fact": "playedBefore",
+        "op": "exists"
+      },
+      {
+        "fact": "daysAway",
+        "op": "gte",
+        "value": 7
+      },
+      {
+        "fact": "clockRewound",
+        "op": "missing"
+      }
+    ],
+    "lines": [
+      "{daysAway}日ぶり……。もう、来てくれないのかと思った。",
+      "{daysAway}日。……ずっと、ここで待ってたんだよ。"
+    ],
+    "expression": "sad"
+  },
+  {
+    "id": "board.lateNight",
+    "concept": "board",
+    "criteria": [
+      {
+        "fact": "place",
+        "op": "eq",
+        "value": "ship"
+      },
+      {
+        "fact": "planet",
+        "op": "missing"
+      },
+      {
+        "fact": "playedBefore",
+        "op": "exists"
+      },
+      {
+        "fact": "hour",
+        "op": "lt",
+        "value": 5
+      }
+    ],
+    "lines": [
+      "……もう{hour}時だよ？ こんな時間に、会いに来てくれたの？"
+    ],
+    "expression": "surprised"
+  },
+  {
+    "id": "board.morning",
+    "concept": "board",
+    "criteria": [
+      {
+        "fact": "place",
+        "op": "eq",
+        "value": "ship"
+      },
+      {
+        "fact": "planet",
+        "op": "missing"
+      },
+      {
+        "fact": "playedBefore",
+        "op": "exists"
+      },
+      {
+        "fact": "timeOfDay",
+        "op": "eq",
+        "value": "morning"
+      }
+    ],
+    "lines": [
+      "おはよう。朝の窓の外は、星が少し薄く見えるね。"
+    ],
+    "expression": "relaxed"
   },
   {
     "id": "board.return",
@@ -186,6 +337,62 @@
     "lines": [
       "船の部屋だよ。星図の台で、次の星を選べる。"
     ]
+  },
+  {
+    "id": "resume.away",
+    "concept": "resume",
+    "criteria": [
+      {
+        "fact": "daysAway",
+        "op": "gte",
+        "value": 1
+      },
+      {
+        "fact": "daysAway",
+        "op": "lt",
+        "value": 7
+      }
+    ],
+    "lines": [
+      "あ……{daysAway}日ぶり。画面の向こうで、何してたの？",
+      "おかえり。{daysAway}日も、止まったままだったよ。"
+    ],
+    "expression": "happy"
+  },
+  {
+    "id": "resume.longAway",
+    "concept": "resume",
+    "criteria": [
+      {
+        "fact": "daysAway",
+        "op": "gte",
+        "value": 7
+      },
+      {
+        "fact": "clockRewound",
+        "op": "missing"
+      }
+    ],
+    "lines": [
+      "{daysAway}日ぶり……。わたしのこと、忘れちゃったかと思った。"
+    ],
+    "expression": "sad"
+  },
+  {
+    "id": "resume.lateNight",
+    "concept": "resume",
+    "criteria": [
+      {
+        "fact": "hour",
+        "op": "lt",
+        "value": 5
+      }
+    ],
+    "lines": [
+      "おかえり。……もう{hour}時だよ？ 少しだけ、ね。"
+    ],
+    "expression": "relaxed",
+    "cooldown": 3600
   },
   {
     "id": "starmap.first",
@@ -637,6 +844,28 @@
     ],
     "expression": "sad",
     "cooldown": 60
+  },
+  {
+    "id": "idle.lateNight",
+    "concept": "idle",
+    "criteria": [
+      {
+        "fact": "idleSeconds",
+        "op": "gte",
+        "value": 20
+      },
+      {
+        "fact": "hour",
+        "op": "lt",
+        "value": 5
+      }
+    ],
+    "lines": [
+      "……ふぁ。夜更かしさん、眠くない？",
+      "もう{hour}時だよ？ わたしは眠らないけど、あなたは寝なきゃ。"
+    ],
+    "expression": "relaxed",
+    "cooldown": 300
   },
   {
     "id": "idle.default",

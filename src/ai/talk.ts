@@ -1,3 +1,4 @@
+import { visitFacts, writeClockFacts, type PlayLog } from './clock';
 import type { DialogueLine, DialogueSelector, FactValue } from './dialogue';
 import type { Emotion } from './emotion';
 
@@ -21,6 +22,41 @@ export class TalkDirector {
     private readonly emotion: Emotion | null = null,
   ) {
     emotion?.writeFacts(this.facts);
+  }
+
+  /** 端末の時計の「時」（0〜23）を事実に入れる（hour・timeOfDay）。起動時と、ときどき呼ぶ */
+  setClock(hour: number): void {
+    writeClockFacts(hour, this.facts);
+  }
+
+  /**
+   * 起動したとき。前回のプレイの記録から「N 日ぶり」などの事実を入れる（時計が戻っていたら入れない）。
+   * 1 日以上ぶりなら、また会えたのがうれしい（感情の reunion）。
+   */
+  startVisit(log: PlayLog | null, nowMs: number): void {
+    // 前の起動（や再開）の事実が残らないよう、入れ直す
+    delete this.facts.playedBefore;
+    delete this.facts.daysAway;
+    delete this.facts.clockRewound;
+    const facts = visitFacts(log, nowMs);
+    Object.assign(this.facts, facts);
+    if (typeof facts.daysAway === 'number' && facts.daysAway >= 1) this.emotion?.feel('reunion');
+  }
+
+  /**
+   * 再読み込みせずに画面へ戻ってきたとき（スマホでアプリを切り替えて戻ったときなど）。
+   * 前回の記録と比べ直し、「N 日ぶり」や深夜なら話しかける（合うセリフがなければ黙っている）。
+   */
+  resume(log: PlayLog | null, nowMs: number, hour: number, now: number): DialogueLine | null {
+    this.setClock(hour);
+    this.startVisit(log, nowMs);
+    this.facts.idleSeconds = 0;
+    // 話すセリフがあるときだけ、話している途中のセリフを打ち切る（なければ続きをそのまま話す）
+    const busyUntil = this.busyUntil;
+    this.interrupt();
+    const line = this.say('resume', now);
+    if (!line) this.busyUntil = busyUntil;
+    return line;
   }
 
   /**

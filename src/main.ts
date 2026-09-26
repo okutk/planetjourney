@@ -17,6 +17,7 @@ import {
   WebGLRenderer,
 } from 'three';
 import { DialogueSelector, parseRules } from './ai/dialogue';
+import { nextPlayLog, parsePlayLog } from './ai/clock';
 import { Emotion, emotionalStride, emotionVoice, moodFace, parseEmotionRules } from './ai/emotion';
 import { TalkDirector } from './ai/talk';
 import { pipopaTimeline, DEFAULT_PIPOPA_CONFIG } from './audio/pipopa';
@@ -39,6 +40,7 @@ import { DEFAULT_WALKER_CONFIG, SphericalWalker, type Walker, type WalkInput } f
 import { DEFAULT_WARP_CONFIG, WarpSequence } from './core/warp';
 import planetsData from './data/planets.json';
 import { FADE_SECONDS, Fader } from './ui/fade';
+import { localStore } from './ui/localStore';
 import { PerfOverlay } from './ui/perfOverlay';
 import { StarMapPanel } from './ui/starMap';
 import { TouchControls } from './ui/touchControls';
@@ -128,6 +130,36 @@ const talk = new TalkDirector(
   speechDuration,
   emotion,
 );
+
+// 現実の時刻。前回のプレイ日時を端末内に残し、「N 日ぶり」や深夜の反応に使う（時計が戻っていたら「久しぶり」とは言わない）
+const PLAY_LOG_KEY = 'playLog';
+const CLOCK_INTERVAL_MS = 60_000;
+let playLog = parsePlayLog(localStore.load(PLAY_LOG_KEY));
+talk.startVisit(playLog, Date.now());
+/** いまの時刻を記録し、時計の事実を更新する。起動時・1 分ごと・画面を離れるときに呼ぶ */
+function recordPlayTime(): void {
+  playLog = nextPlayLog(playLog, Date.now());
+  localStore.save(PLAY_LOG_KEY, playLog);
+  talk.setClock(new Date().getHours());
+}
+recordPlayTime();
+// 画面が隠れている間は記録を進めない（隠れた瞬間の時刻が「前回」になる）
+window.setInterval(() => {
+  if (!document.hidden) recordPlayTime();
+}, CLOCK_INTERVAL_MS);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    recordPlayTime();
+    return;
+  }
+  // 再読み込みせずに戻ってきたときも、前回と比べて「N 日ぶり」や深夜の反応をする。
+  // 隠れている間はループが止まっていて now が古いので、ループと同じ時計で進めてから話す
+  now = performance.now() / 1000;
+  const line = talk.resume(playLog, Date.now(), new Date().getHours(), now);
+  if (line) voice.stop(); // 前のセリフの音と重ならないように
+  say(line, now);
+  recordPlayTime();
+});
 
 // ミラ。VRM を読み込むまでは仮の見た目。プレイヤーの斜め後ろの定位置を目指して、プレイヤーと同じ歩き方でついてくる
 const mira = new MiraView();

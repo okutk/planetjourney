@@ -22,6 +22,7 @@ export const EMOTION_EVENTS = [
   'cancel',
   'ignored',
   'leftBehind',
+  'reunion',
 ] as const;
 export type EmotionEvent = (typeof EMOTION_EVENTS)[number];
 
