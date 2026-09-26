@@ -18,20 +18,20 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
-import { alignToUp, upAt } from './core/sphere';
+import { alignToUp, toTangent, upAt } from './core/sphere';
 import { DEFAULT_WALKER_CONFIG, SphericalWalker, type WalkInput } from './core/walker';
+import { TouchControls } from './ui/touchControls';
 
 // M1: 球面重力で星の上を歩き、ジャンプできるシーン。
-// 操作は動作確認用の最小限のもの。
-//   キーボード: W/S で前後、A/D で向きを変える、Space でジャンプ
-//   タッチ: 画面の左半分を押しているあいだ前進、右半分をタップでジャンプ
-// 本格的なタッチ操作（仮想スティック）・三人称カメラ・地形は別のテーマで入れる。
+// 操作（移動はカメラから見た向き。プレイヤーは進む方向へ向き直る）
+//   タッチ: 左半分に仮想スティック、右半分のドラッグでカメラを回す、右下のボタンでジャンプ
+//   キーボード（補助）: WASD で移動、Space でジャンプ
 // シーンはページと同じ寿命なので、後片付けはページの破棄（開発時はフルリロード）に任せる。
 
 const PLANET_RADIUS = 5;
 const MAX_PIXEL_RATIO = 2; // スマホで描画負荷が跳ね上がらないよう上限を設ける
 const MAX_DT = 1 / 30; // タブ復帰などで dt が跳ねても地面を突き抜けないよう上限を設ける
-const TURN_SPEED = 2.5; // 向きを変える速さ（ラジアン/秒）
+const TURN_SPEED = 12; // プレイヤーが進む方向へ向き直る速さ（ラジアン/秒）
 const CAMERA_DISTANCE = 7;
 const CAMERA_HEIGHT = 4;
 const CAMERA_DAMPING = 6; // 大きいほどカメラがすぐ追いつく
@@ -100,7 +100,7 @@ function createStarField(count: number, radius: number): Points {
   return new Points(geometry, new PointsMaterial({ color: '#ffffff', size: 0.6 }));
 }
 
-// キーボード入力（動作確認用）
+// キーボード入力（補助）
 const pressed = new Set<string>();
 let jumpRequested = false;
 function onKeyDown(event: KeyboardEvent): void {
@@ -115,23 +115,12 @@ function onKeyUp(event: KeyboardEvent): void {
 }
 function onBlur(): void {
   pressed.clear();
-  walkPointers.clear();
+  touch.release();
 }
 function axis(positive: string, negative: string): number {
   return (pressed.has(positive) ? 1 : 0) - (pressed.has(negative) ? 1 : 0);
 }
-// 最小限のタッチ入力（仮想スティックが入るまでのつなぎ）
-const walkPointers = new Set<number>();
-function onPointerDown(event: PointerEvent): void {
-  if (event.clientX < window.innerWidth / 2) walkPointers.add(event.pointerId);
-  else jumpRequested = true;
-}
-function onPointerUp(event: PointerEvent): void {
-  walkPointers.delete(event.pointerId);
-}
-canvas.addEventListener('pointerdown', onPointerDown);
-canvas.addEventListener('pointerup', onPointerUp);
-canvas.addEventListener('pointercancel', onPointerUp);
+const touch = new TouchControls(canvas, document.querySelector<HTMLElement>('#controls')!);
 window.addEventListener('keydown', onKeyDown);
 window.addEventListener('keyup', onKeyUp);
 window.addEventListener('blur', onBlur);
@@ -145,14 +134,19 @@ function resize(): void {
 window.addEventListener('resize', resize);
 resize();
 
-// カメラはプレイヤーの後ろ上から追う（毎フレーム new しないよう使い回す）
+// カメラはプレイヤーの後ろ上から追う（毎フレーム new しないよう使い回す）。
+// カメラの向き（地表に沿った単位ベクトル）はプレイヤーの向きとは別に持ち、
+// プレイヤーが動いた分の回転で一緒に運ぶので、星を回り込んでもずれない
+const cameraHeading = walker.forward.clone();
+const cameraRight = new Vector3();
 const cameraGoal = new Vector3();
 const cameraTarget = new Vector3();
+const moveDirection = new Vector3();
 function cameraGoalFor(out: Vector3): Vector3 {
   return out
     .copy(walker.position)
     .addScaledVector(walker.up, CAMERA_HEIGHT)
-    .addScaledVector(walker.forward, -CAMERA_DISTANCE);
+    .addScaledVector(cameraHeading, -CAMERA_DISTANCE);
 }
 function updateCamera(dt: number): void {
   cameraGoalFor(cameraGoal);
@@ -171,11 +165,26 @@ renderer.setAnimationLoop((time) => {
   const dt = lastTime === undefined ? 0 : Math.min((time - lastTime) / 1000, MAX_DT);
   lastTime = time;
 
-  walker.turn(axis('KeyA', 'KeyD') * TURN_SPEED * dt);
-  input.forward = walkPointers.size > 0 ? 1 : axis('KeyW', 'KeyS');
-  input.jump = jumpRequested;
+  // 右へドラッグすると、カメラが右へ回り込む（上から見て時計回り）
+  cameraHeading.applyAxisAngle(walker.up, -touch.consumeYaw());
+
+  // スティック（なければキーボード）の入力を、カメラから見た地表の向きに直す
+  let stickX = touch.stick.x;
+  let stickY = touch.stick.y;
+  if (stickX === 0 && stickY === 0) {
+    stickX = axis('KeyD', 'KeyA');
+    stickY = axis('KeyW', 'KeyS');
+  }
+  const amount = Math.min(1, Math.hypot(stickX, stickY));
+  cameraRight.crossVectors(cameraHeading, walker.up);
+  moveDirection.copy(cameraHeading).multiplyScalar(stickY).addScaledVector(cameraRight, stickX);
+  if (amount > 0) walker.faceTowards(moveDirection, TURN_SPEED * dt);
+
+  input.forward = amount;
+  input.jump = jumpRequested || touch.consumeJump();
   jumpRequested = false;
   walker.step(input, dt);
+  toTangent(cameraHeading.applyQuaternion(walker.lastRotation), walker.up);
 
   player.position.copy(walker.position);
   walker.orientation(player.quaternion);

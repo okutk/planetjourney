@@ -50,6 +50,8 @@ export class SphericalWalker {
   verticalSpeed = 0;
   /** 地面に立っているか */
   grounded = false;
+  /** 直前の step で地表に沿って動いた分の回転（中心まわり）。カメラの向きを一緒に運ぶのに使う */
+  readonly lastRotation = new Quaternion();
 
   constructor(readonly config: WalkerConfig) {
     this.placeAt(new Vector3(0, 1, 0), new Vector3(0, 0, 1));
@@ -81,6 +83,16 @@ export class SphericalWalker {
     this.orthonormalizeForward();
   }
 
+  /** direction の方へ、最大 maxAngle だけ向きを回す。direction は地表に沿う成分だけを使う。 */
+  faceTowards(direction: Vector3, maxAngle: number): void {
+    tmpMove.copy(direction).addScaledVector(this.up, -direction.dot(this.up));
+    if (tmpMove.lengthSq() < 1e-12) return;
+    // up を軸にした、forward から direction までの符号付きの角度
+    tmpAxis.crossVectors(this.forward, tmpMove);
+    const angle = Math.atan2(tmpAxis.dot(this.up), this.forward.dot(tmpMove));
+    this.turn(Math.max(-maxAngle, Math.min(maxAngle, angle)));
+  }
+
   /** dt 秒だけ進める。 */
   step(input: WalkInput, dt: number): void {
     const { center, planetRadius, gravity, walkSpeed, jumpSpeed } = this.config;
@@ -96,6 +108,7 @@ export class SphericalWalker {
     tmpRight.crossVectors(this.forward, this.up);
     tmpMove.copy(this.forward).multiplyScalar(input.forward).addScaledVector(tmpRight, input.right);
     const inputLength = tmpMove.length();
+    this.lastRotation.identity();
     if (inputLength > 1e-6) {
       const distance = walkSpeed * Math.min(inputLength, 1) * dt;
       const radius = this.position.distanceTo(center);
@@ -105,6 +118,7 @@ export class SphericalWalker {
       this.position.addVectors(center, tmpOffset);
       // 向きも同じ回転で運ぶ（平行移動）ので、歩いても向きが勝手に変わらない
       this.forward.applyQuaternion(tmpRotation);
+      this.lastRotation.copy(tmpRotation);
     }
 
     // 重力と上下の移動
