@@ -78,8 +78,10 @@ scene.add(sun);
 // 「はじまりの星」。地形は歩く処理と見た目で同じものを使う
 const planetCenter = new Vector3();
 const SPAWN_DIRECTION = new Vector3(0, 1, 0);
-// 着陸ポッドは出現位置の少し後ろ（-Z 側）。降りた直後は目の前ではなく、振り返ると見える
-const POD_DIRECTION = new Vector3(0, Math.cos(0.3), -Math.sin(0.3));
+// 着陸ポッドは出現位置の少し後ろ（-Z 側）。降りた直後は目の前ではなく、振り返ると見える。
+// 降りた瞬間に「船に戻る」が出ないよう、ボタンの出る距離より確実に離す（地形の起伏があっても届かない角度）
+const POD_ANGLE = (ACTION_RADIUS * 1.5) / PLANET_RADIUS;
+const POD_DIRECTION = new Vector3(0, Math.cos(POD_ANGLE), -Math.sin(POD_ANGLE));
 const terrain = new Terrain({ radius: PLANET_RADIUS, amplitude: 0.5, frequency: 1.3, octaves: 3, seed: 1 });
 const planet = new PlanetView(terrain, {
   detail: 16,
@@ -88,7 +90,7 @@ const planet = new PlanetView(terrain, {
   rockCount: 18,
   seed: 2,
   spawn: SPAWN_DIRECTION,
-  spawnClearance: 0.45,
+  spawnClearance: POD_ANGLE + 0.2, // ポッドのまわりにも木や岩を置かない
 });
 scene.add(planet.group);
 const pod = new LandingPod(terrain, POD_DIRECTION);
@@ -108,6 +110,12 @@ const noseGeometry = new BoxGeometry(0.2, 0.12, 0.2);
 noseGeometry.translate(0, 0.9, 0.3);
 player.add(new Mesh(noseGeometry, new MeshStandardMaterial({ color: '#40325c' })));
 scene.add(player);
+
+// ミラの会話。セリフは src/data/dialogue.json から条件で選び、吹き出しとピポパ音声で話す
+const talk = new TalkDirector(new DialogueSelector(parseRules(dialogueData), createRandom(Date.now())), (text) => {
+  const { revealAt } = pipopaTimeline(text);
+  return (revealAt.at(-1) ?? 0) + DEFAULT_PIPOPA_CONFIG.charInterval;
+});
 
 // ミラ（仮の見た目）。プレイヤーの斜め後ろの定位置を目指して、プレイヤーと同じ歩き方でついてくる
 const mira = new MiraPlaceholder();
@@ -137,16 +145,13 @@ interface Stage {
   /** 調べられる物の位置（ワールド座標）と、近づいたときのボタンの文言 */
   readonly spot: Vector3;
   readonly spotLabel: string;
-  /** この場所に入ったとき。プレイヤーとミラを出現位置に置く */
+  /** この場所に入ったとき。プレイヤーとミラを出現位置に置き、会話の事実（いる場所）を更新する */
   enter(): void;
-  /** 入ってしばらくしてから話すあいさつ */
-  greet(now: number): void;
   /** ボタンが押されたとき（暗転の先で次の場所へ移る） */
   act(): void;
 }
 
 const journey = new Journey();
-let planetVisits = 0; // いまの星に降りた回数（あいさつの選び方に使う）
 
 const shipWalker = new RoomWalker(roomConfig);
 const shipMira = new RoomWalker({ ...roomConfig, walkSpeed: MIRA_WALK_SPEED });
@@ -159,13 +164,11 @@ const shipStage: Stage = {
     hud.textContent = '船の部屋';
     shipRoom.group.visible = true;
     journey.board();
+    talk.enterShip();
     // 窓（-Z 側）の方を向いて、部屋の奥に立つ
     shipWalker.placeAt(0, 1.5, new Vector3(0, 0, -1));
     const slot = followSlot(shipWalker, DEFAULT_FOLLOW_CONFIG, new Vector3()).sub(SHIP_POSITION);
     shipMira.placeAt(slot.x, slot.z, shipWalker.forward);
-  },
-  greet(now) {
-    say(talk.board(now), now);
   },
   act() {
     switchTo(planetStage);
@@ -182,13 +185,10 @@ const planetStage: Stage = {
   enter() {
     hud.textContent = PLANET_NAME;
     shipRoom.group.visible = false;
-    planetVisits = journey.land(PLANET_NAME);
+    talk.enterPlanet(PLANET_NAME, journey.land(PLANET_NAME));
     planetWalker.placeAt(SPAWN_DIRECTION, new Vector3(0, 0, 1));
     const slot = followSlot(planetWalker, DEFAULT_FOLLOW_CONFIG, new Vector3()).sub(planetCenter);
     planetMira.placeAt(slot, planetWalker.forward);
-  },
-  greet(now) {
-    say(talk.arrive(now, PLANET_NAME, planetVisits), now);
   },
   act() {
     switchTo(shipStage);
@@ -248,7 +248,7 @@ resize();
 
 // 三人称カメラ。向きはプレイヤーと一緒に運び、歩いているとしばらくして後ろへ回り込む。
 // 実際のカメラは目標の位置へ減衰付きで追いかける（毎フレーム new しないよう使い回す）
-let orbit: OrbitCamera;
+const orbit = new OrbitCamera(DEFAULT_ORBIT_CAMERA_CONFIG, new Vector3(0, 0, 1), new Vector3(0, 1, 0));
 const cameraRight = new Vector3();
 const cameraGoal = new Vector3();
 const cameraTarget = new Vector3();
@@ -266,11 +266,6 @@ const perf = new URLSearchParams(window.location.search).has('debug')
   ? new PerfOverlay(document.body, renderer)
   : null;
 
-// ミラの会話。セリフは src/data/dialogue.json から条件で選び、吹き出しとピポパ音声で話す
-const talk = new TalkDirector(new DialogueSelector(parseRules(dialogueData), createRandom(Date.now())), (text) => {
-  const { revealAt } = pipopaTimeline(text);
-  return (revealAt.at(-1) ?? 0) + DEFAULT_PIPOPA_CONFIG.charInterval;
-});
 const voice = new VoicePlayer();
 const bubble = new SpeechBubble(document.body);
 // 音はユーザーが画面に触れる（キーを押す）まで鳴らせないので、最初の操作で準備する。
@@ -287,7 +282,7 @@ function say(line: { text: string } | null, now: number): void {
 }
 const bubbleAnchor = new Vector3();
 
-// 場所の切り替え。暗転の途中で入れ替え、カメラは新しい場所の後ろへ飛ばす
+// 場所の切り替え。暗転の途中で入れ替え、カメラは新しい場所の後ろへ飛ばす（ズームと見下ろす角度は引き継ぐ）
 const fader = new Fader(document.body);
 let stage: Stage;
 let greetAt = Infinity; // この時刻になったら、入った場所のあいさつをする
@@ -300,7 +295,7 @@ function enterStage(next: Stage): void {
   talk.interrupt();
   voice.stop();
   bubble.hide();
-  orbit = new OrbitCamera(DEFAULT_ORBIT_CAMERA_CONFIG, stage.walker.forward, stage.walker.up);
+  orbit.reset(stage.walker.forward, stage.walker.up);
   camera.position.copy(orbit.eye(stage.walker.position, stage.walker.up, cameraGoal));
   camera.up.copy(stage.walker.up);
   greetAt = elapsed + ARRIVE_TALK_DELAY;
@@ -359,11 +354,14 @@ renderer.setAnimationLoop((time) => {
   actionRequested = false;
   if (nearSpot && action) stage.act();
 
-  // 会話: 場所に入ったとき・ジャンプしたとき・しばらく放っておかれたとき
+  // 会話: 場所に入ったとき・ジャンプしたとき・しばらく放っておかれたとき。
+  // 入ってからあいさつまでの間は、ジャンプなどのセリフで割り込ませない（あいさつが消えないように）
   const now = time / 1000;
   if (elapsed >= greetAt) {
     greetAt = Infinity;
-    stage.greet(now);
+    say(talk.greet(now), now);
+  } else if (greetAt !== Infinity) {
+    // あいさつ待ち
   } else if (wasGrounded && !walker.grounded && input.jump) {
     say(talk.jumped(now), now);
   } else {

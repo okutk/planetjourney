@@ -18,20 +18,23 @@ export class TalkDirector {
     private readonly durationOf: (text: string) => number,
   ) {}
 
-  /** 星に着いたとき。visits はその星に降りた回数（初めてなら 1）。 */
-  arrive(now: number, planet: string, visits: number): DialogueLine | null {
+  /** 星に降りたとき。visits はその星に降りた回数（初めてなら 1）。事実だけを更新し、あいさつは greet() で話す。 */
+  enterPlanet(planet: string, visits: number): void {
     this.facts.place = 'planet';
     this.facts.planet = planet;
     this.facts.visits = visits;
     this.facts.idleSeconds = 0;
-    return this.say('greet', now);
   }
 
   /** 船の部屋に入ったとき（旅の始まりと、星から戻ったとき）。planet には最後に降りた星が残る。 */
-  board(now: number): DialogueLine | null {
+  enterShip(): void {
     this.facts.place = 'ship';
     this.facts.idleSeconds = 0;
-    return this.say('board', now);
+  }
+
+  /** いまいる場所のあいさつ（星なら greet、船なら board）。 */
+  greet(now: number): DialogueLine | null {
+    return this.say(this.facts.place === 'ship' ? 'board' : 'greet', now);
   }
 
   /** プレイヤーがジャンプしたとき。 */

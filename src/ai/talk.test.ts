@@ -8,40 +8,59 @@ const rules = parseRules(dialogueData);
 
 function createDirector(): TalkDirector {
   const director = new TalkDirector(new DialogueSelector(rules, createRandom(1)), () => 2);
-  director.arrive(-10, 'はじまりの星', 1);
+  director.enterPlanet('はじまりの星', 1);
+  director.greet(-10);
   return director;
 }
 
 describe('TalkDirector', () => {
   it('初めて星に着いたときは初回のあいさつをし、2 回目からは星の名前を入れて話す', () => {
     const director = new TalkDirector(new DialogueSelector(rules, createRandom(1)), () => 2);
-    expect(director.arrive(0, 'はじまりの星', 1)?.ruleId).toBe('greet.first');
-    const again = director.arrive(100, 'はじまりの星', 2);
+    director.enterPlanet('はじまりの星', 1);
+    expect(director.greet(0)?.ruleId).toBe('greet.first');
+    director.enterPlanet('はじまりの星', 2);
+    const again = director.greet(100);
     expect(again?.ruleId).toBe('greet.planet');
     expect(again?.text).toContain('はじまりの星');
   });
 
   it('旅の始まりは船の案内、星から戻ったら星の名前を入れて迎える', () => {
     const director = new TalkDirector(new DialogueSelector(rules, createRandom(1)), () => 2);
-    expect(director.board(0)?.ruleId).toBe('board.first');
-    director.arrive(100, 'はじまりの星', 1);
-    const back = director.board(200);
+    director.enterShip();
+    expect(director.greet(0)?.ruleId).toBe('board.first');
+    director.enterPlanet('はじまりの星', 1);
+    director.greet(100);
+    director.enterShip();
+    const back = director.greet(200);
     expect(back?.ruleId).toBe('board.return');
     expect(director.facts.place).toBe('ship');
   });
 
+  it('星に降りた直後（あいさつの前）に跳んでも、船のセリフにはならず、あいさつも言える', () => {
+    const director = new TalkDirector(new DialogueSelector(rules, createRandom(1)), () => 0.2);
+    director.enterShip();
+    director.greet(0);
+    director.enterPlanet('はじまりの星', 1);
+    expect(director.facts.place).toBe('planet');
+    expect(director.jumped(2)?.ruleId).toBe('jump.first');
+    expect(director.greet(4)?.ruleId).toBe('greet.first');
+  });
+
   it('打ち切ると、話している途中でも次のセリフを話せる', () => {
     const director = createDirector();
-    director.arrive(0, 'はじまりの星', 2);
-    expect(director.board(1)).toBeNull();
+    director.enterPlanet('はじまりの星', 2);
+    director.greet(0);
+    director.enterShip();
+    expect(director.greet(1)).toBeNull();
     director.interrupt();
     expect(director.isSpeaking(1)).toBe(false);
-    expect(director.board(1)?.ruleId).toBe('board.return');
+    expect(director.greet(1)?.ruleId).toBe('board.return');
   });
 
   it('船の中では、星の上とは違うセリフで反応する', () => {
     const director = new TalkDirector(new DialogueSelector(rules, createRandom(1)), () => 2);
-    director.board(0);
+    director.enterShip();
+    director.greet(0);
     expect(director.jumped(10)?.ruleId).toBe('jump.ship');
     let said = null;
     for (let t = 20; t < 45 && !said; t += 1) said = director.update(1, false, t);
@@ -50,7 +69,8 @@ describe('TalkDirector', () => {
 
   it('話している途中とその直後は割り込まず、次に反応できたジャンプで初回のセリフを言う', () => {
     const director = createDirector();
-    director.arrive(0, 'はじまりの星', 2);
+    director.enterPlanet('はじまりの星', 2);
+    director.greet(0);
     expect(director.isSpeaking(1)).toBe(true);
     expect(director.jumped(1)).toBeNull();
     expect(director.jumped(3)).toBeNull(); // 話し終えて 1.5 秒たつまでは間を置く

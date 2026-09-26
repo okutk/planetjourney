@@ -24,7 +24,7 @@ export const SHIP_ROOM = {
 } as const;
 
 /**
- * 船の部屋の見た目。床・壁・天井は内側を向いた板だけで作り、1 つのメッシュにまとめる。
+ * 船の部屋の見た目。床・壁・天井は内側を向いた板だけで作り、1 つのメッシュにまとめる（部屋全体でメッシュは 3 つ）。
  * 板は表しか描かないので、カメラが部屋の外に出ても手前の壁は透けて、中が見える（ドールハウスのように）。
  * -Z の壁には窓をあけ、外の星が見える。不要になったら dispose() する。
  */
@@ -57,36 +57,30 @@ export class ShipRoomView {
     const shellMaterial = this.track(new MeshStandardMaterial({ color: '#3a3f66', roughness: 0.9 }));
     this.group.add(new Mesh(shell, shellMaterial));
 
-    // 窓の縁。光る細い枠で囲む
+    // 光る部品（窓の縁・壁ぎわの帯・星図の台の円盤）は同じ材質なので、1 つのメッシュにまとめる
     const frame = 0.08;
-    const windowFrame = this.track(
+    const disc = new CylinderGeometry(0.5, 0.5, 0.06, 24);
+    disc.translate(c.x, consoleHeight + 0.03, c.z);
+    const glowParts = this.track(
       mergeGeometries([
         box(windowWidth + frame * 2, frame, frame, 0, sillHeight - frame / 2, -d + frame / 2),
         box(windowWidth + frame * 2, frame, frame, 0, windowTop + frame / 2, -d + frame / 2),
         box(frame, windowTop - sillHeight, frame, -windowWidth / 2 - frame / 2, (sillHeight + windowTop) / 2, -d + frame / 2),
         box(frame, windowTop - sillHeight, frame, windowWidth / 2 + frame / 2, (sillHeight + windowTop) / 2, -d + frame / 2),
-      ]),
-    );
-
-    // 壁ぎわの光る帯（床と天井の境）。部屋の明かりに見せる
-    const strip = this.track(
-      mergeGeometries([
         box(w * 2, 0.06, 0.06, 0, 0.03, d - 0.03),
         box(0.06, 0.06, d * 2, -w + 0.03, 0.03, 0),
         box(0.06, 0.06, d * 2, w - 0.03, 0.03, 0),
         box(w * 2, 0.06, 0.06, 0, 0.03, -d + 0.03),
+        disc,
       ]),
     );
     const glow = this.track(new MeshStandardMaterial({ color: '#9fe8ff', emissive: '#6fd6ff', emissiveIntensity: 1.2 }));
-    this.group.add(new Mesh(strip, glow), new Mesh(windowFrame, glow));
+    this.group.add(new Mesh(glowParts, glow));
 
-    // 星図の台。八角柱の脚に、光る円盤を載せる
+    // 星図の台の脚（八角柱）
     const pedestal = this.track(new CylinderGeometry(0.35, 0.45, consoleHeight, 8));
     pedestal.translate(c.x, consoleHeight / 2, c.z);
     this.group.add(new Mesh(pedestal, this.track(new MeshStandardMaterial({ color: '#4a4f7a', flatShading: true }))));
-    const disc = this.track(new CylinderGeometry(0.5, 0.5, 0.06, 24));
-    disc.translate(c.x, consoleHeight + 0.03, c.z);
-    this.group.add(new Mesh(disc, glow));
 
     // 天井の明かり。窓から入る光だけでは暗いので、1 つだけ置く
     const light = new PointLight('#ffe9c4', 12, 9, 2);
