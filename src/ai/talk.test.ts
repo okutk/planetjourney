@@ -6,6 +6,8 @@ import { DialogueSelector, parseRules } from './dialogue';
 import { Emotion, parseEmotionRules } from './emotion';
 import memoryData from '../data/memory.json';
 import { MemoryBook, parseMemoryRules } from './memory';
+import codexData from '../data/codex.json';
+import { Codex, parseCodex } from './codex';
 import { TalkDirector } from './talk';
 
 const rules = parseRules(dialogueData);
@@ -316,6 +318,7 @@ describe('TalkDirector', () => {
     const memoryRules = parseMemoryRules(memoryData);
     function withMemory() {
       const book = new MemoryBook(memoryRules);
+      const codex = new Codex(parseCodex(codexData), book);
       let nowMs = Date.UTC(2026, 8, 1, 12);
       const director = new TalkDirector(new DialogueSelector(rules, createRandom(1)), () => 2, null, {
         book,
@@ -323,6 +326,7 @@ describe('TalkDirector', () => {
         nowMs: () => nowMs,
         nameOf: (place) => (place === 'origin' ? 'はじまりの星' : place),
         random: () => 0,
+        codex,
       });
       return { book, director, advance: (ms: number) => (nowMs += ms) };
     }
@@ -372,6 +376,20 @@ describe('TalkDirector', () => {
       expect(said?.ruleId).toBe('reminisce.landed');
       expect(said?.text).toContain('はじまりの星');
       expect(said?.text).toContain('2日前');
+    });
+
+    it('図鑑の項目が体験に変わったら、話せるときに話す（見た物も体験になる）', () => {
+      const { director } = withMemory();
+      director.enterShip();
+      director.greet(0);
+      director.inspected('星図の台');
+      expect(director.announceDiscovery(0.5)).toBeNull(); // 話している途中は待つ
+      const line = director.announceDiscovery(10);
+      expect(line?.ruleId).toBe('codex.default');
+      expect(line?.text).toContain('星図の台');
+      expect(director.announceDiscovery(20)).toBeNull();
+      director.enterPlanet('ocean', '海だけの星', 1);
+      expect(director.announceDiscovery(30)?.ruleId).toBe('codex.rare');
     });
   });
 });
