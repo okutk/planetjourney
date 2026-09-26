@@ -3,8 +3,10 @@ import { toTangent } from './sphere';
 
 /** 三人称カメラの設定値。角度はラジアン。 */
 export interface OrbitCameraConfig {
-  /** 注視点からカメラまでの距離 */
+  /** 注視点からカメラまでの距離（初期値と、ズームできる範囲） */
   distance: number;
+  minDistance: number;
+  maxDistance: number;
   /** 注視点の、足元からの高さ */
   lookHeight: number;
   /** 見下ろす角度の範囲（地表に沿った向きから上へ） */
@@ -18,6 +20,8 @@ export interface OrbitCameraConfig {
 
 export const DEFAULT_ORBIT_CAMERA_CONFIG: Readonly<OrbitCameraConfig> = {
   distance: 7.6,
+  minDistance: 4,
+  maxDistance: 14,
   lookHeight: 1,
   minPitch: 0.05,
   maxPitch: 1.2,
@@ -40,6 +44,8 @@ export class OrbitCamera {
   readonly heading = new Vector3();
   /** 見下ろす角度 */
   pitch = 0.4;
+  /** 注視点からカメラまでの距離 */
+  distance: number;
   private sinceManual = Infinity;
 
   constructor(
@@ -48,6 +54,13 @@ export class OrbitCamera {
     up: Vector3,
   ) {
     toTangent(this.heading.copy(heading), up);
+    this.distance = config.distance;
+  }
+
+  /** 距離を factor 倍にする（1 より大きいと遠ざかる）。minDistance〜maxDistance に収める。 */
+  zoom(factor: number): void {
+    const { minDistance, maxDistance } = this.config;
+    this.distance = Math.max(minDistance, Math.min(maxDistance, this.distance * factor));
   }
 
   /** 手で回す。yaw は正で右へ回り込む（上から見て時計回り）、pitch は正で上から見下ろす。 */
@@ -88,7 +101,7 @@ export class OrbitCamera {
 
   /** カメラの位置を out に書き込む。注視点から、後ろ上へ distance だけ離れた場所。 */
   eye(position: Vector3, up: Vector3, out: Vector3): Vector3 {
-    const { distance } = this.config;
+    const { distance } = this;
     return this.target(position, up, out)
       .addScaledVector(this.heading, -Math.cos(this.pitch) * distance)
       .addScaledVector(up, Math.sin(this.pitch) * distance);

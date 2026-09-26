@@ -25,7 +25,8 @@ import { PlanetView } from './world/planet';
 // M1: 「はじまりの星」の上を、球面重力で歩いてジャンプできるシーン。
 // 操作（移動はカメラから見た向き。プレイヤーは進む方向へ向き直る）
 //   タッチ: 左半分に仮想スティック、右半分のドラッグでカメラを回す（上下で見下ろす角度）、右下のボタンでジャンプ
-//   キーボード（補助）: WASD で移動、Space でジャンプ
+//   キーボード・マウス（補助）: WASD で移動、Space でジャンプ、矢印キーかマウスのドラッグでカメラを回す、
+//   ホイールでズーム
 // シーンはページと同じ寿命なので、後片付けはページの破棄（開発時はフルリロード）に任せる。
 
 const PLANET_RADIUS = 5;
@@ -33,6 +34,7 @@ const MAX_PIXEL_RATIO = 2; // スマホで描画負荷が跳ね上がらない�
 const MAX_DT = 1 / 30; // タブ復帰などで dt が跳ねても地面を突き抜けないよう上限を設ける
 const TURN_SPEED = 12; // プレイヤーが進む方向へ向き直る速さ（ラジアン/秒）
 const CAMERA_DAMPING = 6; // 大きいほどカメラがすぐ追いつく
+const KEY_CAMERA_SPEED = 2; // 矢印キーでカメラを回す速さ（ラジアン/秒）
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
 const renderer = new WebGLRenderer({ canvas, antialias: true });
@@ -153,7 +155,12 @@ renderer.setAnimationLoop((time) => {
   const dt = lastTime === undefined ? 0 : Math.min((time - lastTime) / 1000, MAX_DT);
   lastTime = time;
 
-  orbit.rotate(touch.consumeYaw(), touch.consumePitch(), walker.up);
+  orbit.rotate(
+    touch.consumeYaw() + axis('ArrowRight', 'ArrowLeft') * KEY_CAMERA_SPEED * dt,
+    touch.consumePitch() + axis('ArrowUp', 'ArrowDown') * KEY_CAMERA_SPEED * dt,
+    walker.up,
+  );
+  orbit.zoom(touch.consumeZoom());
 
   // スティック（なければキーボード）の入力を、カメラから見た地表の向きに直す
   let stickX = touch.stick.x;
