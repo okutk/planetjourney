@@ -46,8 +46,13 @@
     "criteria": [
       {
         "fact": "jumps",
-        "op": "eq",
+        "op": "gte",
         "value": 1
+      },
+      {
+        "fact": "jumps",
+        "op": "lt",
+        "value": 20
       }
     ],
     "lines": [

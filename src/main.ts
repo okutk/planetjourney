@@ -16,6 +16,13 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
+import { DialogueSelector, parseRules } from './ai/dialogue';
+import { TalkDirector } from './ai/talk';
+import { pipopaTimeline, DEFAULT_PIPOPA_CONFIG } from './audio/pipopa';
+import { VoicePlayer } from './audio/voicePlayer';
+import { createRandom } from './core/noise';
+import dialogueData from './data/dialogue.json';
+import { SpeechBubble } from './ui/speechBubble';
 import { DEFAULT_FOLLOW_CONFIG, followIntent, followSlot, type FollowIntent } from './ai/companion';
 import { MiraPlaceholder } from './character/miraPlaceholder';
 import { DEFAULT_ORBIT_CAMERA_CONFIG, OrbitCamera } from './core/orbitCamera';
@@ -176,6 +183,32 @@ const perf = new URLSearchParams(window.location.search).has('debug')
   ? new PerfOverlay(document.body, renderer)
   : null;
 
+// ミラの会話。セリフは src/data/dialogue.json から条件で選び、吹き出しとピポパ音声で話す
+const ARRIVE_TALK_DELAY = 1; // 着いてから話し始めるまで（秒）
+const talk = new TalkDirector(
+  new DialogueSelector(parseRules(dialogueData), createRandom(Date.now())),
+  (text) => {
+    const { revealAt } = pipopaTimeline(text);
+    return (revealAt.at(-1) ?? 0) + DEFAULT_PIPOPA_CONFIG.charInterval;
+  },
+  'はじまりの星',
+);
+const voice = new VoicePlayer();
+const bubble = new SpeechBubble(document.body);
+// 音はユーザーが画面に触れる（キーを押す）まで鳴らせないので、最初の操作で準備する。
+// タッチの pointerdown はユーザー操作として数えられないブラウザがあるので、pointerup・touchend でも呼ぶ
+const unlockVoice = () => voice.unlock();
+for (const type of ['pointerdown', 'pointerup', 'touchend', 'keydown']) {
+  window.addEventListener(type, unlockVoice);
+}
+function speak(text: string, now: number): void {
+  const { beeps, revealAt } = pipopaTimeline(text);
+  voice.play(beeps);
+  bubble.show(text, revealAt, now);
+}
+let arrived = false;
+const bubbleAnchor = new Vector3();
+
 const input: WalkInput = { forward: 0, right: 0, jump: false };
 let lastTime: number | undefined;
 renderer.setAnimationLoop((time) => {
@@ -206,6 +239,7 @@ renderer.setAnimationLoop((time) => {
   input.forward = amount;
   input.jump = jumpRequested || touch.consumeJump();
   jumpRequested = false;
+  const wasGrounded = walker.grounded;
   walker.step(input, dt);
   orbit.transport(walker.lastRotation, walker.up);
   orbit.update(dt, walker.forward, walker.up, stickX, stickY);
@@ -215,11 +249,30 @@ renderer.setAnimationLoop((time) => {
   miraInput.forward = miraIntent.amount;
   miraWalker.step(miraInput, dt);
 
+  // 会話: 着いたとき・ジャンプしたとき・しばらく放っておかれたとき
+  const now = time / 1000;
+  const line =
+    !arrived && now > ARRIVE_TALK_DELAY
+      ? ((arrived = true), talk.arrive(now))
+      : wasGrounded && !walker.grounded && input.jump
+        ? talk.jumped(now)
+        : talk.update(dt, amount > 0, now);
+  if (line) speak(line.text, now);
+
   player.position.copy(walker.position);
   walker.orientation(player.quaternion);
   mira.group.position.copy(miraWalker.position);
   miraWalker.orientation(mira.group.quaternion);
   updateCamera(dt);
   renderer.render(scene, camera);
+
+  // 吹き出しはミラの頭の上に出す（画面の外やカメラの後ろなら隠す）
+  bubbleAnchor.copy(miraWalker.position).addScaledVector(miraWalker.up, 1.1).project(camera);
+  bubble.update(
+    now,
+    ((bubbleAnchor.x + 1) / 2) * canvas.clientWidth,
+    ((1 - bubbleAnchor.y) / 2) * canvas.clientHeight,
+    bubbleAnchor.z < 1 && Math.abs(bubbleAnchor.x) < 1 && Math.abs(bubbleAnchor.y) < 1,
+  );
   perf?.update(rawDt);
 });

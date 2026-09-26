@@ -22,4 +22,15 @@ describe('FrameRateMeter', () => {
     expect(meter.fps).toBeCloseTo(10 / 1.0);
     expect(meter.worstFrameMs).toBeCloseTo(500);
   });
+
+  it('1 秒を超えるフレーム（別のタブから戻った直後など）は計測から外す', () => {
+    const meter = new FrameRateMeter(0.5);
+    meter.tick(1 / 60);
+    expect(meter.tick(10)).toBe(false);
+    expect(meter.fps).toBe(0);
+    let frames = 0;
+    while (!meter.tick(1 / 60)) frames += 1;
+    expect(meter.fps).toBeCloseTo(60);
+    expect(meter.worstFrameMs).toBeCloseTo(1000 / 60);
+  });
 });
