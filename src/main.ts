@@ -142,7 +142,11 @@ const journey = new Journey();
 const loaded = parseSaveData(localStore.load(SAVE_KEY));
 if (loaded) {
   journey.restore(loaded.journey);
-  if (loaded.emotion) emotion.restore(loaded.emotion);
+  if (loaded.emotion) {
+    emotion.restore(loaded.emotion);
+    // 前回から経った時間ぶん落ち着かせる（何日も前の気分を引きずらない。信頼は戻らないのでそのまま）
+    if (loaded.playLog) emotion.update(Math.max(0, (Date.now() - loaded.playLog.lastPlayedAt) / 1000));
+  }
 }
 let playLog = loaded?.playLog ?? null;
 /** いまの状態を保存する。旅が変わったとき（降りる・解く・拾う・強化）と、時刻を記録するときに呼ぶ */

@@ -41,6 +41,7 @@ export function parseJourneySave(data: unknown): JourneySave | null {
   const counts = Object.entries(landings as Record<string, unknown>);
   if (!counts.every(([, count]) => isCount(count) && count > 0)) return null;
   if (!isKeyList(solved) || !isKeyList(collected)) return null;
+  // 段階の上限はかけらで上げられる最大。段階 4（機械の廃墟星の物語）を足すときは、ここの上限も上げること
   if (!isCount(stage) || stage > MAX_FRAGMENT_STAGE) return null;
   if (new Set(collected).size < spentFragments(stage)) return null;
   return {
