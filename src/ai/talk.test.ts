@@ -93,6 +93,22 @@ describe('TalkDirector', () => {
     expect(director.cancelTask(10.5)?.ruleId).toBe('taskCancelled.default');
   });
 
+  it('かけらを拾うと初回は特別なセリフ、投影機を強化すると段階ごとのセリフ、足りなければ残りの数を言う', () => {
+    const director = createDirector();
+    const first = director.collectedFragment(0, 1);
+    expect(first?.ruleId).toBe('fragment.first');
+    const second = director.collectedFragment(1, 2);
+    expect(second?.ruleId).toBe('fragment.default');
+    expect(second?.text).toContain('2');
+    director.enterShip();
+    const short = director.upgradeShort(10, 1);
+    expect(short?.ruleId).toBe('upgradeShort.default');
+    expect(short?.text).toContain('1');
+    expect(director.upgraded(20, 1)?.ruleId).toBe('upgrade.1');
+    expect(director.upgraded(30, 2)?.ruleId).toBe('upgrade.2');
+    expect(director.upgraded(40, 3)?.ruleId).toBe('upgrade.3');
+  });
+
   it('打ち切ると、話している途中でも次のセリフを話せる', () => {
     const director = createDirector();
     director.enterPlanet('origin', 'はじまりの星', 2);

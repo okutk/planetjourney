@@ -17,6 +17,12 @@ import type { Terrain } from '../core/terrain';
 
 /** 作業の効果（広がる輪）の色 */
 const EFFECT_COLOR = '#9fe8ff';
+/** 星のかけらの色と、浮かぶ位置（仕掛けの横。ランプなどと重ならないように）・回る速さ */
+const FRAGMENT_COLOR = '#ffe9a8';
+const FRAGMENT_OFFSET = new Vector3(0.6, 0.9, 0);
+const FRAGMENT_SPIN = 1.6;
+/** プレイヤーがこの距離まで近づくと、かけらを拾う */
+export const PICKUP_RADIUS = 1;
 
 /**
  * 星の仕掛けの見た目。種類ごとに形が違い、ミラが解くと光る。
@@ -38,6 +44,16 @@ export class GimmickView {
     opacity: 0,
   });
   private readonly litColor: string;
+  /** 解けたあとに現れる星のかけら。拾うまで浮いて回る */
+  private readonly fragment: Mesh;
+  private readonly fragmentMaterial = new MeshStandardMaterial({
+    color: FRAGMENT_COLOR,
+    emissive: FRAGMENT_COLOR,
+    emissiveIntensity: 0.9,
+  });
+  /** かけらの位置（ワールド座標）。拾える距離の判定に使う */
+  readonly fragmentPosition = new Vector3();
+  private spin = 0;
 
   constructor(terrain: Terrain, def: GimmickDef) {
     const direction = new Vector3(...def.direction).normalize();
@@ -94,6 +110,32 @@ export class GimmickView {
     this.effect = new Mesh(ring, this.effectMaterial);
     this.effect.visible = false;
     this.group.add(this.effect);
+
+    const gem = this.track(new OctahedronGeometry(0.14, 0));
+    gem.scale(1, 1.6, 1);
+    this.fragment = new Mesh(gem, this.fragmentMaterial);
+    this.fragment.position.copy(FRAGMENT_OFFSET);
+    this.fragment.visible = false;
+    this.group.add(this.fragment);
+    // ワールド座標でのかけらの位置（仕掛けの向きに合わせて、横のずれを回す）
+    this.fragmentPosition.copy(FRAGMENT_OFFSET).applyQuaternion(this.group.quaternion).add(this.position);
+  }
+
+  /** かけらを出す（解けたあと、まだ拾っていないとき）か、しまう（拾ったとき）。 */
+  setFragment(visible: boolean): void {
+    this.fragment.visible = visible;
+  }
+
+  get hasFragment(): boolean {
+    return this.fragment.visible;
+  }
+
+  /** 毎フレーム呼ぶ。かけらが出ていれば、回りながら上下に揺れる。 */
+  update(dt: number): void {
+    if (!this.fragment.visible) return;
+    this.spin += dt * FRAGMENT_SPIN;
+    this.fragment.rotation.y = this.spin;
+    this.fragment.position.y = FRAGMENT_OFFSET.y + Math.sin(this.spin * 1.5) * 0.06;
   }
 
   /** 解けているか（光っているか）を設定する。 */
@@ -119,9 +161,15 @@ export class GimmickView {
     for (const geometry of this.geometries) geometry.dispose();
     this.lit.dispose();
     this.effectMaterial.dispose();
+    this.fragmentMaterial.dispose();
     this.group.traverse((object) => {
       const material = (object as Mesh).material;
-      if (material instanceof MeshStandardMaterial && material !== this.lit && material !== this.effectMaterial) {
+      if (
+        material instanceof MeshStandardMaterial &&
+        material !== this.lit &&
+        material !== this.effectMaterial &&
+        material !== this.fragmentMaterial
+      ) {
         material.dispose();
       }
     });

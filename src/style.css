@@ -30,6 +30,19 @@ body {
   pointer-events: none;
 }
 
+/* 手持ちのかけらと投影機の段階（右上） */
+#status {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(16px, env(safe-area-inset-right));
+  color: #ffe9a8;
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  opacity: 0.85;
+  pointer-events: none;
+}
+
 /* タッチ操作 */
 #controls {
   position: fixed;
