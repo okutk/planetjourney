@@ -53,12 +53,14 @@ export class MiraView {
   private disposed = false;
   /** 体の硬さ（0〜1）。モデルが入る前に設定されても、入ったときに反映する */
   private solidity = 0;
+  /** モデルの読み込みが終わる（読めなかったときも仮表示のまま終わる）まで */
+  readonly loaded: Promise<void>;
 
   constructor() {
     const placeholder = new MiraPlaceholder();
     this.placeholder = placeholder;
     this.group.add(placeholder.group);
-    void this.load();
+    this.loaded = this.load();
   }
 
   private async load(): Promise<void> {

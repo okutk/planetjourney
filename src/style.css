@@ -143,6 +143,28 @@ body {
   }
 }
 
+/* 縦向きのスマホで出す案内（横向きが基本。ホーム画面に追加すると横向きの全画面で開く） */
+#rotate-hint {
+  display: none;
+  position: fixed;
+  left: 50%;
+  bottom: max(140px, calc(env(safe-area-inset-bottom) + 120px));
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border-radius: 16px;
+  background: rgba(232, 236, 255, 0.12);
+  color: #e8ecff;
+  font: 13px system-ui, sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+@media (orientation: portrait) and (pointer: coarse) {
+  #rotate-hint {
+    display: block;
+  }
+}
+
 /* 性能の表示（?debug のときだけ） */
 .perf-overlay {
   position: fixed;

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- ほしめぐりのアイコン（自作）。中央 80% の安全域に絵を収め、maskable にも使う -->
+  <rect width="512" height="512" fill="#0b1026"/>
+  <circle cx="120" cy="96" r="3" fill="#e8ecff" opacity="0.7"/>
+  <circle cx="400" cy="120" r="2.5" fill="#e8ecff" opacity="0.6"/>
+  <circle cx="90" cy="380" r="2" fill="#e8ecff" opacity="0.5"/>
+  <circle cx="420" cy="410" r="3" fill="#e8ecff" opacity="0.7"/>
+  <!-- 軌道（奥半分）。手前半分は星の上に描く -->
+  <clipPath id="front"><rect x="0" y="272" width="512" height="240"/></clipPath>
+  <ellipse cx="256" cy="272" rx="176" ry="52" fill="none" stroke="#9fe8ff" stroke-width="8" opacity="0.7" transform="rotate(-18 256 272)"/>
+  <!-- 小さな星（惑星）と、その丸み -->
+  <circle cx="256" cy="272" r="120" fill="#5fbf93"/>
+  <path d="M136 272a120 120 0 0 1 240 0z" fill="#7fd6a8"/>
+  <ellipse cx="214" cy="228" rx="34" ry="22" fill="#a8e6c4" opacity="0.8"/>
+  <ellipse cx="300" cy="300" rx="28" ry="16" fill="#4fae84" opacity="0.8"/>
+  <!-- 軌道（手前半分） -->
+  <g clip-path="url(#front)"><ellipse cx="256" cy="272" rx="176" ry="52" fill="none" stroke="#9fe8ff" stroke-width="8" opacity="0.9" transform="rotate(-18 256 272)"/></g>
+  <!-- 星のかけら -->
+  <path d="M356 132l10 26 26 10-26 10-10 26-10-26-26-10 26-10z" fill="#ffe9a8"/>
+  <path d="M150 150l6 14 14 6-14 6-6 14-6-14-14-6 14-6z" fill="#f4c7d8"/>
+</svg>
