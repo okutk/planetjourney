@@ -353,6 +353,10 @@ describe('TalkDirector', () => {
       director.enterPlanet('origin', 'はじまりの星', 2);
       expect(director.facts.here_leftBehind).toBe(1);
       expect(director.greet(100)?.ruleId).toBe('greet.remember.lost');
+      // 何度も降りるたびに同じ話を蒸し返さない（しばらくは、ふつうのあいさつ）
+      director.enterShip();
+      director.enterPlanet('origin', 'はじまりの星', 3);
+      expect(director.greet(200)?.ruleId).not.toBe('greet.remember.lost');
     });
 
     it('しばらく放っておかれると、思い出話をする', () => {

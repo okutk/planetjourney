@@ -90,9 +90,12 @@
       }
     ],
     "lines": [
-      "{planet}……前に、ここではぐれたよね。今日は、そばにいてね。"
+      "{planet}……前に、ここではぐれたよね。今日は、そばにいてね。",
+      "また{planet}。……今度は、置いていかないでね。",
+      "{planet}に来ると、はぐれたときのこと、少しだけ思い出す。"
     ],
-    "expression": "sad"
+    "expression": "sad",
+    "cooldown": 1800
   },
   {
     "id": "greet.curious",
