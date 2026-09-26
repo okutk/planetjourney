@@ -9,8 +9,9 @@ import { MToonMaterial } from '@pixiv/three-vrm';
  * 投影範囲の端では、ちらつき（不透明度の揺れ）と体の横ずれでノイズを表す。
  */
 
-/** 普段の不透明度 */
+/** 普段の不透明度（投影機の段階 0）と、段階が最大のときの不透明度（「硬い光」） */
 const BASE_OPACITY = 0.78;
+const SOLID_OPACITY = 0.96;
 /** 縁の光の色と、体全体にかける淡い発光 */
 const RIM_COLOR = new Color('#7fe6ff');
 const GLOW_COLOR = new Color('#16384f');
@@ -38,6 +39,8 @@ function stripOutline(object: Object3D): void {
 
 export class HologramLook {
   private readonly materials: MToonMaterial[] = [];
+  /** 体の硬さ（0〜1）。投影機の段階が上がると増え、不透明になっていく */
+  private solidity = 0;
 
   constructor(private readonly vrm: VRM) {
     vrm.scene.traverse((object: Object3D) => stripOutline(object));
@@ -64,6 +67,11 @@ export class HologramLook {
     }
   }
 
+  /** 体の硬さ（0〜1）を設定する（投影機の段階 ÷ 最大の段階）。 */
+  setSolidity(solidity: number): void {
+    this.solidity = Math.min(1, Math.max(0, solidity));
+  }
+
   /**
    * 毎フレーム呼ぶ。noise はノイズの強さ（0〜1）、visibility は見え方（0 で消えている）。
    * ノイズがあるときだけ乱数でちらつかせる（毎フレームの new はしない）。
@@ -76,7 +84,8 @@ export class HologramLook {
       if (Math.random() < 0.3 + 0.6 * noise) flicker = Math.random() * FLICKER_DEPTH * noise;
       if (Math.random() < noise * 0.8) jitter = (Math.random() - 0.5) * 2 * JITTER_WIDTH * noise;
     }
-    const opacity = BASE_OPACITY * visibility * (1 - flicker);
+    const base = BASE_OPACITY + (SOLID_OPACITY - BASE_OPACITY) * this.solidity;
+    const opacity = base * visibility * (1 - flicker);
     const glow = BASE_GLOW + NOISE_GLOW * noise * (0.5 + flicker);
     for (const material of this.materials) {
       material.opacity = opacity;

@@ -649,6 +649,112 @@
     ]
   },
   {
+    "id": "fragment.first",
+    "concept": "fragment",
+    "criteria": [
+      {
+        "fact": "collected",
+        "op": "eq",
+        "value": 1
+      },
+      {
+        "fact": "place",
+        "op": "eq",
+        "value": "planet"
+      }
+    ],
+    "lines": [
+      "これが、星のかけら……。あったかい。データでは、ただの鉱物だったのに。"
+    ],
+    "once": true,
+    "expression": "surprised"
+  },
+  {
+    "id": "fragment.default",
+    "concept": "fragment",
+    "criteria": [
+      {
+        "fact": "collected",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "かけら、{collected}個目。船に戻ったら、投影機に入れよう。",
+      "拾った。……きらきらしてる。データにない色。"
+    ],
+    "expression": "happy"
+  },
+  {
+    "id": "upgrade.1",
+    "concept": "upgrade",
+    "criteria": [
+      {
+        "fact": "stage",
+        "op": "eq",
+        "value": 1
+      }
+    ],
+    "lines": [
+      "……手が、少し重い。ううん、重いんじゃなくて……これが『触れる』ってことなのかな。"
+    ],
+    "once": true,
+    "expression": "surprised"
+  },
+  {
+    "id": "upgrade.2",
+    "concept": "upgrade",
+    "criteria": [
+      {
+        "fact": "stage",
+        "op": "eq",
+        "value": 2
+      }
+    ],
+    "lines": [
+      "体の輪郭が、はっきりした気がする。……足跡、残るかな。"
+    ],
+    "once": true,
+    "expression": "happy"
+  },
+  {
+    "id": "upgrade.3",
+    "concept": "upgrade",
+    "criteria": [
+      {
+        "fact": "stage",
+        "op": "eq",
+        "value": 3
+      }
+    ],
+    "lines": [
+      "押せる、かも。動かせる、かも。……ねえ、試しに行こう。"
+    ],
+    "once": true,
+    "expression": "happy"
+  },
+  {
+    "id": "upgrade.default",
+    "concept": "upgrade",
+    "criteria": [],
+    "lines": [
+      "投影機、強化完了。……なんだか、体が少し確かになった。"
+    ]
+  },
+  {
+    "id": "upgradeShort.default",
+    "concept": "upgradeShort",
+    "criteria": [
+      {
+        "fact": "need",
+        "op": "exists"
+      }
+    ],
+    "lines": [
+      "かけらが足りない。あと{need}個、集めよう。",
+      "もう少し。あと{need}個で、次の段階。"
+    ]
+  },
+  {
     "id": "jump.first",
     "concept": "jump",
     "criteria": [

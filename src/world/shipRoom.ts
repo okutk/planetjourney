@@ -6,6 +6,7 @@ import {
   MeshStandardMaterial,
   PlaneGeometry,
   PointLight,
+  SphereGeometry,
   type BufferGeometry,
   type Material,
 } from 'three';
@@ -21,6 +22,9 @@ export const SHIP_ROOM = {
   console: { x: 0, z: -1.9, radius: 0.75 } satisfies RoomObstacle,
   /** 星図の台の天板の高さ */
   consoleHeight: 0.9,
+  /** 投影機の台（かけらで強化する所）。右の壁ぎわ */
+  projector: { x: 2.2, z: 0.4, radius: 0.7 } satisfies RoomObstacle,
+  projectorHeight: 1.1,
 } as const;
 
 /**
@@ -34,7 +38,7 @@ export class ShipRoomView {
   private readonly materials: Material[] = [];
 
   constructor() {
-    const { halfWidth: w, halfDepth: d, height: h, console: c, consoleHeight } = SHIP_ROOM;
+    const { halfWidth: w, halfDepth: d, height: h, console: c, consoleHeight, projector: pj, projectorHeight } = SHIP_ROOM;
     // 窓は幅 3.6・高さ 1.4 で、床から 0.7 の高さにあける
     const windowWidth = 3.6;
     const sillHeight = 0.7;
@@ -57,10 +61,13 @@ export class ShipRoomView {
     const shellMaterial = this.track(new MeshStandardMaterial({ color: '#3a3f66', roughness: 0.9 }));
     this.group.add(new Mesh(shell, shellMaterial));
 
-    // 光る部品（窓の縁・壁ぎわの帯・星図の台の円盤）は同じ材質なので、1 つのメッシュにまとめる
+    // 光る部品（窓の縁・壁ぎわの帯・星図の台の円盤・投影機のレンズ）は同じ材質なので、1 つのメッシュにまとめる
     const frame = 0.08;
     const disc = new CylinderGeometry(0.5, 0.5, 0.06, 24);
     disc.translate(c.x, consoleHeight + 0.03, c.z);
+    // レンズは球にする（八面体は index を持たず、box や cylinder と 1 つのジオメトリにまとめられない）
+    const lens = new SphereGeometry(0.16, 10, 8);
+    lens.translate(pj.x, projectorHeight + 0.2, pj.z);
     const glowParts = this.track(
       mergeGeometries([
         box(windowWidth + frame * 2, frame, frame, 0, sillHeight - frame / 2, -d + frame / 2),
@@ -72,15 +79,19 @@ export class ShipRoomView {
         box(0.06, 0.06, d * 2, w - 0.03, 0.03, 0),
         box(w * 2, 0.06, 0.06, 0, 0.03, -d + 0.03),
         disc,
+        lens,
       ]),
     );
     const glow = this.track(new MeshStandardMaterial({ color: '#9fe8ff', emissive: '#6fd6ff', emissiveIntensity: 1.2 }));
     this.group.add(new Mesh(glowParts, glow));
 
-    // 星図の台の脚（八角柱）
-    const pedestal = this.track(new CylinderGeometry(0.35, 0.45, consoleHeight, 8));
-    pedestal.translate(c.x, consoleHeight / 2, c.z);
-    this.group.add(new Mesh(pedestal, this.track(new MeshStandardMaterial({ color: '#4a4f7a', flatShading: true }))));
+    // 星図の台と投影機の台の脚（八角柱）。同じ材質なので 1 つにまとめる
+    const consolePedestal = new CylinderGeometry(0.35, 0.45, consoleHeight, 8);
+    consolePedestal.translate(c.x, consoleHeight / 2, c.z);
+    const projectorPedestal = new CylinderGeometry(0.2, 0.3, projectorHeight, 8);
+    projectorPedestal.translate(pj.x, projectorHeight / 2, pj.z);
+    const pedestals = this.track(mergeGeometries([consolePedestal, projectorPedestal]));
+    this.group.add(new Mesh(pedestals, this.track(new MeshStandardMaterial({ color: '#4a4f7a', flatShading: true }))));
 
     // 天井の明かり。窓から入る光だけでは暗いので、1 つだけ置く
     const light = new PointLight('#ffe9c4', 12, 9, 2);

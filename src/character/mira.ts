@@ -51,6 +51,8 @@ export class MiraView {
   /** 差し替え用のモーション。null なら手続きのモーションを使う */
   private clips: MotionClips | null = null;
   private disposed = false;
+  /** 体の硬さ（0〜1）。モデルが入る前に設定されても、入ったときに反映する */
+  private solidity = 0;
 
   constructor() {
     const placeholder = new MiraPlaceholder();
@@ -104,11 +106,18 @@ export class MiraView {
     this.group.add(vrm.scene);
     this.motion = new MiraMotion(vrm.scene, this.clips ?? buildProceduralClips(vrm));
     this.hologram = new HologramLook(vrm);
+    this.hologram.setSolidity(this.solidity);
     this.hologram.update(0, 1);
     // T ポーズのまま 1 フレームも見せないよう、最初の姿勢をすぐ反映する
     this.motion.update(0, 0);
     vrm.update(0);
     this.settle();
+  }
+
+  /** 体の硬さ（0〜1）を設定する。投影機の段階が上がると不透明になっていく（「硬い光」）。 */
+  setSolidity(solidity: number): void {
+    this.solidity = solidity;
+    this.hologram?.setSolidity(solidity);
   }
 
   /**
