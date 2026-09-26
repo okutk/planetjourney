@@ -1,0 +1,31 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #0b1026;
+  /* スマホでのスクロール・ズーム・長押しメニューを抑止する */
+  touch-action: none;
+  overscroll-behavior: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+#game {
+  display: block;
+  width: 100vw;
+  height: 100dvh;
+}
+
+#hud {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  left: max(16px, env(safe-area-inset-left));
+  color: #e8ecff;
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  opacity: 0.8;
+  pointer-events: none;
+}

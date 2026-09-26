@@ -1,0 +1,29 @@
+{
+  "name": "planetjourney",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "美少女AIと小さな星をめぐる3Dゲーム（ブラウザ／Android向け）",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite",
+    "dev:lan": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check:offline": "node scripts/check-offline.mjs",
+    "check": "npm run typecheck && npm run check:offline && npm test && npm run build"
+  },
+  "dependencies": {
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.186.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1",
+    "vitest": "^5.0.2"
+  }
+}
