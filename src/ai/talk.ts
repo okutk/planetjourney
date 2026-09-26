@@ -9,7 +9,7 @@ const MIN_GAP = 1.5;
  */
 export class TalkDirector {
   /** 会話の判断材料。セリフの {名前} にも使う。place は 'ship'（船の部屋）か 'planet'（星の上） */
-  readonly facts: Record<string, FactValue> = { place: 'ship', jumps: 0, idleSeconds: 0, affection: 20 };
+  readonly facts: Record<string, FactValue> = { place: 'ship', jumps: 0, warps: 0, idleSeconds: 0, affection: 20 };
   private busyUntil = -Infinity;
 
   constructor(
@@ -35,6 +35,19 @@ export class TalkDirector {
   /** いまいる場所のあいさつ（星なら greet、船なら board）。 */
   greet(now: number): DialogueLine | null {
     return this.say(this.facts.place === 'ship' ? 'board' : 'greet', now);
+  }
+
+  /** 星図を開いたとき。 */
+  openedStarMap(now: number): DialogueLine | null {
+    return this.say('starmap', now);
+  }
+
+  /** 行き先を決めてワープを始めたとき。destination は行き先の星の名前。 */
+  warp(now: number, destination: string): DialogueLine | null {
+    this.facts.warps = (this.facts.warps as number) + 1;
+    this.facts.destination = destination;
+    this.facts.idleSeconds = 0;
+    return this.say('warp', now);
   }
 
   /** プレイヤーがジャンプしたとき。 */
