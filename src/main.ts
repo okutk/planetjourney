@@ -647,8 +647,8 @@ function updateBehavior(dt: number, walker: Walker, miraWalker: Walker): void {
 refreshStatus();
 mira.setSolidity(journey.stage / MAX_FRAGMENT_STAGE);
 enterStage(shipStage);
-// PWA: 本番ビルドではサービスワーカーを登録し、次からはオフラインでも起動できるようにする
-registerServiceWorker();
+// PWA: 本番ビルドではサービスワーカーを登録し、次からはオフラインでも起動できるようにする（ミラのモデルを読み終えてから）
+registerServiceWorker(mira.loaded);
 
 const input: WalkInput = { forward: 0, right: 0, jump: false };
 let lastTime: number | undefined;
