@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { createRandom } from '../core/noise';
 import dialogueData from '../data/dialogue.json';
+import emotionData from '../data/emotion.json';
 import { DialogueSelector, parseRules } from './dialogue';
+import { Emotion, parseEmotionRules } from './emotion';
 import { TalkDirector } from './talk';
 
 const rules = parseRules(dialogueData);
+const emotionRules = parseEmotionRules(emotionData);
 
 function createDirector(): TalkDirector {
   const director = new TalkDirector(new DialogueSelector(rules, createRandom(1)), () => 2);
@@ -149,5 +152,44 @@ describe('TalkDirector', () => {
     expect(said?.ruleId).toBe('idle.planet');
     director.update(0.1, true, t);
     expect(director.facts.idleSeconds).toBe(0);
+  });
+
+  it('出来事で感情が動き、話すときに感情の値と気分が事実に入る', () => {
+    const emotion = new Emotion(emotionRules);
+    const director = new TalkDirector(new DialogueSelector(rules, createRandom(1)), () => 2, emotion);
+    expect(director.facts.trust).toBe(emotionRules.baseline.trust);
+    director.enterShip(); // 旅の始まりは「帰ってきた」ではない
+    expect(emotion.values.anxiety).toBe(emotionRules.baseline.anxiety);
+    director.warp(0, 'はじまりの星');
+    director.enterPlanet('origin', 'はじまりの星', 1);
+    expect(emotion.values.curiosity).toBeGreaterThan(emotionRules.baseline.curiosity + 30);
+    director.greet(10);
+    expect(director.facts.mood).toBe('curious');
+    const anxietyBefore = emotion.values.anxiety;
+    director.enterShip();
+    expect(emotion.values.anxiety).toBeLessThan(anxietyBefore);
+    const trustBefore = emotion.values.trust;
+    director.askTask(20, 'scan', '石碑');
+    director.finishTask(30, 1);
+    expect(emotion.values.trust).toBeGreaterThan(trustBefore);
+  });
+
+  it('しばらく放っておかれるとさみしくなり、不安なときは不安なセリフを選ぶ', () => {
+    const emotion = new Emotion(emotionRules);
+    const director = new TalkDirector(new DialogueSelector(rules, createRandom(1)), () => 2, emotion);
+    director.enterPlanet('origin', 'はじまりの星', 2);
+    emotion.feel('leftBehind');
+    emotion.feel('leftBehind');
+    const joyBefore = emotion.values.joy;
+    // 不安なときは、ふつうの放置のセリフ（20 秒）より早く、不安なセリフを話す
+    let said = null;
+    let t = 0;
+    for (; t < 20 && !said; t += 0.5) said = director.update(0.5, false, 100 + t);
+    expect(said?.ruleId).toBe('idle.anxious');
+    expect(director.facts.idleSeconds).toBeLessThan(11);
+    expect(emotion.values.joy).toBe(joyBefore);
+    // さらに ignoredAfter 秒まで放っておかれると、さみしくなる（ignored で喜びが下がる）
+    for (; t < emotionRules.ignoredAfter + 1; t += 0.5) director.update(0.5, false, 100 + t);
+    expect(emotion.values.joy).toBeLessThan(joyBefore);
   });
 });

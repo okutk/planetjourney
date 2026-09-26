@@ -76,6 +76,31 @@
     "expression": "happy"
   },
   {
+    "id": "greet.curious",
+    "concept": "greet",
+    "criteria": [
+      {
+        "fact": "planet",
+        "op": "exists"
+      },
+      {
+        "fact": "visits",
+        "op": "gte",
+        "value": 2
+      },
+      {
+        "fact": "curiosity",
+        "op": "gte",
+        "value": 80
+      }
+    ],
+    "lines": [
+      "{planet}、前と少し違って見える。……確かめに行こう！",
+      "また{planet}。前に見落としたもの、きっとあるよ。"
+    ],
+    "expression": "surprised"
+  },
+  {
     "id": "greet.default",
     "concept": "greet",
     "criteria": [],
@@ -124,6 +149,31 @@
     "expression": "happy"
   },
   {
+    "id": "board.relieved",
+    "concept": "board",
+    "criteria": [
+      {
+        "fact": "place",
+        "op": "eq",
+        "value": "ship"
+      },
+      {
+        "fact": "planet",
+        "op": "exists"
+      },
+      {
+        "fact": "mood",
+        "op": "eq",
+        "value": "anxious"
+      }
+    ],
+    "lines": [
+      "……よかった、ちゃんと帰ってこられた。",
+      "船の中は、落ち着くね。……ちょっとだけ、こわかった。"
+    ],
+    "expression": "relaxed"
+  },
+  {
     "id": "board.default",
     "concept": "board",
     "criteria": [
@@ -157,6 +207,26 @@
     ],
     "once": true,
     "expression": "relaxed"
+  },
+  {
+    "id": "starmap.curious",
+    "concept": "starmap",
+    "criteria": [
+      {
+        "fact": "place",
+        "op": "eq",
+        "value": "ship"
+      },
+      {
+        "fact": "curiosity",
+        "op": "gte",
+        "value": 70
+      }
+    ],
+    "lines": [
+      "どの星にも、まだ知らないことがある気がする。早く行こう！"
+    ],
+    "expression": "happy"
   },
   {
     "id": "starmap.default",
@@ -415,6 +485,33 @@
     "expression": "happy"
   },
   {
+    "id": "jump.joyful",
+    "concept": "jump",
+    "criteria": [
+      {
+        "fact": "place",
+        "op": "eq",
+        "value": "planet"
+      },
+      {
+        "fact": "mood",
+        "op": "eq",
+        "value": "joyful"
+      },
+      {
+        "fact": "jumps",
+        "op": "lt",
+        "value": 20
+      }
+    ],
+    "lines": [
+      "ふふっ、いまのジャンプ、いい高さ！",
+      "もっと跳んで！ 見てるの、楽しい。"
+    ],
+    "expression": "happy",
+    "cooldown": 20
+  },
+  {
     "id": "jump.default",
     "concept": "jump",
     "criteria": [],
@@ -483,7 +580,7 @@
         "value": 60
       },
       {
-        "fact": "affection",
+        "fact": "trust",
         "op": "lt",
         "value": 30
       }
@@ -504,7 +601,7 @@
         "value": 60
       },
       {
-        "fact": "affection",
+        "fact": "trust",
         "op": "gte",
         "value": 30
       }
@@ -514,6 +611,32 @@
     ],
     "cooldown": 60,
     "expression": "relaxed"
+  },
+  {
+    "id": "idle.anxious",
+    "concept": "idle",
+    "criteria": [
+      {
+        "fact": "idleSeconds",
+        "op": "gte",
+        "value": 10
+      },
+      {
+        "fact": "mood",
+        "op": "eq",
+        "value": "anxious"
+      },
+      {
+        "fact": "anxiety",
+        "op": "gte",
+        "value": 40
+      }
+    ],
+    "lines": [
+      "……ねえ、どこにも行かないよね？"
+    ],
+    "expression": "sad",
+    "cooldown": 60
   },
   {
     "id": "idle.default",

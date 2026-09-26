@@ -1,0 +1,16 @@
+{
+  "baseline": { "joy": 40, "curiosity": 50, "anxiety": 20, "trust": 20 },
+  "ignoredAfter": 45,
+  "halfLife": { "joy": 60, "curiosity": 45, "anxiety": 40, "trust": null },
+  "events": {
+    "discover": { "curiosity": 30, "joy": 10, "anxiety": 5, "trust": 2 },
+    "arrive": { "curiosity": 10, "joy": 8 },
+    "home": { "anxiety": -15, "joy": 5, "trust": 1 },
+    "warp": { "curiosity": 15, "anxiety": 10 },
+    "jump": { "joy": 3 },
+    "solve": { "joy": 12, "curiosity": 5, "trust": 2 },
+    "cancel": { "joy": -5, "anxiety": 5 },
+    "ignored": { "joy": -10, "anxiety": 10 },
+    "leftBehind": { "anxiety": 20, "joy": -5, "trust": -1 }
+  }
+}
