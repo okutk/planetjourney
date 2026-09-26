@@ -89,4 +89,18 @@ describe('OrbitCamera', () => {
       expect(walkWithStick(Math.sin(rad), Math.cos(rad))).toBeLessThan(Math.PI / 4);
     }
   });
+
+  it('zoom で距離が変わり、範囲内に収まる', () => {
+    const camera = createCamera();
+    const { distance, minDistance, maxDistance } = DEFAULT_ORBIT_CAMERA_CONFIG;
+    camera.zoom(1.5);
+    expect(camera.distance).toBeCloseTo(distance * 1.5);
+    const position = new Vector3(0, 5, 0);
+    const target = camera.target(position, UP, new Vector3());
+    expect(camera.eye(position, UP, new Vector3()).distanceTo(target)).toBeCloseTo(distance * 1.5);
+    camera.zoom(100);
+    expect(camera.distance).toBe(maxDistance);
+    camera.zoom(0.001);
+    expect(camera.distance).toBe(minDistance);
+  });
 });

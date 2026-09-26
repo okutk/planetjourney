@@ -82,3 +82,10 @@ body {
 .jump-button:active {
   background: rgba(244, 199, 216, 0.6);
 }
+
+/* マウスで遊ぶとき（タッチ画面でないとき）は、ジャンプボタンを隠す（Space でジャンプ） */
+@media (hover: hover) and (pointer: fine) {
+  .jump-button {
+    display: none;
+  }
+}

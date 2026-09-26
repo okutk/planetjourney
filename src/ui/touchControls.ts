@@ -3,10 +3,12 @@ import { stickFromDrag, type StickValue } from '../core/stick';
 const STICK_RADIUS = 56; // スティックを倒しきる距離（CSS ピクセル）
 const STICK_DEAD_ZONE = 0.15;
 const CAMERA_DRAG_SPEED = 0.008; // ドラッグ 1px あたりのカメラの回転（ラジアン）
+const WHEEL_ZOOM_SPEED = 0.001; // ホイール 1 単位あたりのズーム（指数）
 
 /**
  * タッチ操作。画面の左半分は押した場所に出る仮想スティック、右半分のドラッグはカメラの回転（上下で見下ろす角度）、
- * 右下のボタンでジャンプ。Pointer Events なのでマウスでも同じように動く。
+ * 右下のボタンでジャンプ。マウスでは、画面のどこをドラッグしてもカメラが回り、ホイールでズームする
+ * （マウスの移動はキーボードで行う）。
  */
 export class TouchControls {
   /** 仮想スティックの値（触れていなければ 0） */
@@ -23,6 +25,7 @@ export class TouchControls {
   private cameraLastY = 0;
   private yaw = 0;
   private pitch = 0;
+  private zoom = 1;
   private jump = false;
 
   constructor(
@@ -46,6 +49,7 @@ export class TouchControls {
     surface.addEventListener('pointerup', this.onPointerUp);
     surface.addEventListener('pointercancel', this.onPointerUp);
     surface.addEventListener('contextmenu', this.onContextMenu);
+    surface.addEventListener('wheel', this.onWheel, { passive: false });
     this.jumpButton.addEventListener('pointerdown', this.onJumpDown);
   }
 
@@ -61,6 +65,13 @@ export class TouchControls {
     const pitch = this.pitch;
     this.pitch = 0;
     return pitch;
+  }
+
+  /** 前回呼んでからのズームの倍率（1 より大きいと遠ざかる）を取り出す。 */
+  consumeZoom(): number {
+    const zoom = this.zoom;
+    this.zoom = 1;
+    return zoom;
   }
 
   /** ジャンプボタンが押されたかを取り出す（1 回押すと 1 回だけ true）。 */
@@ -85,6 +96,7 @@ export class TouchControls {
     this.surface.removeEventListener('pointerup', this.onPointerUp);
     this.surface.removeEventListener('pointercancel', this.onPointerUp);
     this.surface.removeEventListener('contextmenu', this.onContextMenu);
+    this.surface.removeEventListener('wheel', this.onWheel);
     this.jumpButton.removeEventListener('pointerdown', this.onJumpDown);
     this.stickBase.remove();
     this.jumpButton.remove();
@@ -93,7 +105,8 @@ export class TouchControls {
   private readonly onPointerDown = (event: PointerEvent): void => {
     // マウスは主ボタンだけ使う（右クリックのメニューに pointerup を取られて押しっぱなしになるのを防ぐ）
     if (event.pointerType === 'mouse' && event.button !== 0) return;
-    const onLeft = event.clientX < this.layer.clientWidth / 2;
+    // マウスはスティックを使わず、どこをドラッグしてもカメラを回す
+    const onLeft = event.pointerType !== 'mouse' && event.clientX < this.layer.clientWidth / 2;
     if (onLeft && this.stickPointer === null) {
       this.stickPointer = event.pointerId;
       this.stickOriginX = event.clientX;
@@ -136,6 +149,11 @@ export class TouchControls {
 
   private readonly onContextMenu = (event: Event): void => {
     event.preventDefault();
+  };
+
+  private readonly onWheel = (event: WheelEvent): void => {
+    event.preventDefault();
+    this.zoom *= Math.exp(event.deltaY * WHEEL_ZOOM_SPEED);
   };
 
   private readonly onJumpDown = (event: PointerEvent): void => {
