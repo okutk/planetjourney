@@ -175,7 +175,7 @@ renderer.setAnimationLoop((time) => {
   jumpRequested = false;
   walker.step(input, dt);
   orbit.transport(walker.lastRotation, walker.up);
-  orbit.update(dt, walker.forward, walker.up, amount > 0);
+  orbit.update(dt, walker.forward, walker.up, stickX, stickY);
 
   player.position.copy(walker.position);
   walker.orientation(player.quaternion);
