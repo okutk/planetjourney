@@ -16,6 +16,8 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
+import { DEFAULT_FOLLOW_CONFIG, followIntent, type FollowIntent } from './ai/companion';
+import { MiraPlaceholder } from './character/miraPlaceholder';
 import { DEFAULT_ORBIT_CAMERA_CONFIG, OrbitCamera } from './core/orbitCamera';
 import { Terrain } from './core/terrain';
 import { DEFAULT_WALKER_CONFIG, SphericalWalker, type WalkInput } from './core/walker';
@@ -33,6 +35,7 @@ const PLANET_RADIUS = 5;
 const MAX_PIXEL_RATIO = 2; // スマホで描画負荷が跳ね上がらないよう上限を設ける
 const MAX_DT = 1 / 30; // タブ復帰などで dt が跳ねても地面を突き抜けないよう上限を設ける
 const TURN_SPEED = 12; // プレイヤーが進む方向へ向き直る速さ（ラジアン/秒）
+const MIRA_WALK_SPEED = 5.5; // プレイヤーより少し速く、離されても追いつける
 const CAMERA_DAMPING = 6; // 大きいほどカメラがすぐ追いつく
 const KEY_CAMERA_SPEED = 2; // 矢印キーでカメラを回す速さ（ラジアン/秒）
 
@@ -83,6 +86,20 @@ const walker = new SphericalWalker({
 });
 // 出現位置は、配置物をあけておく方向と同じにする
 walker.placeAt(SPAWN_DIRECTION, new Vector3(0, 0, 1));
+
+// ミラ（仮の見た目）。プレイヤーの斜め後ろの定位置を目指して、同じ球面重力で歩く
+const mira = new MiraPlaceholder();
+scene.add(mira.group);
+const miraWalker = new SphericalWalker({
+  ...DEFAULT_WALKER_CONFIG,
+  walkSpeed: MIRA_WALK_SPEED,
+  center: planetCenter,
+  planetRadius: PLANET_RADIUS,
+  surfaceRadius: (up) => terrain.radiusAt(up),
+});
+miraWalker.placeAt(new Vector3(0.25, 1, -0.3), new Vector3(0, 0, 1));
+const miraIntent: FollowIntent = { direction: new Vector3(), amount: 0 };
+const miraInput: WalkInput = { forward: 0, right: 0, jump: false };
 
 scene.add(createStarField(800, 120));
 
@@ -181,8 +198,15 @@ renderer.setAnimationLoop((time) => {
   orbit.transport(walker.lastRotation, walker.up);
   orbit.update(dt, walker.forward, walker.up, stickX, stickY);
 
+  followIntent(miraWalker, walker, DEFAULT_FOLLOW_CONFIG, miraIntent);
+  if (miraIntent.amount > 0) miraWalker.faceTowards(miraIntent.direction, TURN_SPEED * dt);
+  miraInput.forward = miraIntent.amount;
+  miraWalker.step(miraInput, dt);
+
   player.position.copy(walker.position);
   walker.orientation(player.quaternion);
+  mira.group.position.copy(miraWalker.position);
+  miraWalker.orientation(mira.group.quaternion);
   updateCamera(dt);
   renderer.render(scene, camera);
 });
