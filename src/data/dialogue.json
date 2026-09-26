@@ -322,6 +322,32 @@
     "expression": "happy"
   },
   {
+    "id": "board.diary",
+    "concept": "board",
+    "criteria": [
+      {
+        "fact": "place",
+        "op": "eq",
+        "value": "ship"
+      },
+      {
+        "fact": "planet",
+        "op": "exists"
+      },
+      {
+        "fact": "diaryNew",
+        "op": "eq",
+        "value": true
+      }
+    ],
+    "lines": [
+      "おかえり。{planet}のこと、日記に書いておいたよ。「日記」から読めるからね。",
+      "日記、書いたよ。……読むのは、ちょっと恥ずかしいけど。"
+    ],
+    "expression": "relaxed",
+    "cooldown": 600
+  },
+  {
     "id": "board.relieved",
     "concept": "board",
     "criteria": [

@@ -21,6 +21,7 @@ function sample(): SaveData {
     emotion: emotion.snapshot(),
     playLog: { lastPlayedAt: 1000 },
     memory: memory.toJSON(),
+    diary: [{ at: 1000, place: 'はじまりの星', text: '初めてのはじまりの星。' }],
   };
 }
 
@@ -40,15 +41,16 @@ describe('parseSaveData', () => {
 
   it('感情や前回の日時だけが壊れていれば、そこだけ null にして旅は続ける', () => {
     const save = sample();
-    const parsed = parseSaveData({ ...save, emotion: { joy: 'x' }, playLog: 'yesterday', memory: 'lost' });
+    const parsed = parseSaveData({ ...save, emotion: { joy: 'x' }, playLog: 'yesterday', memory: 'lost', diary: 'torn' });
     const empty = { version: 1, entries: [] };
-    expect(parsed).toEqual({ ...save, emotion: null, playLog: null, memory: empty });
+    expect(parsed).toEqual({ ...save, emotion: null, playLog: null, memory: empty, diary: [] });
     // 記憶を足す前の保存（memory がない）も読め、記憶は空から
     expect(parseSaveData({ version: SAVE_VERSION, journey: save.journey })).toEqual({
       ...save,
       emotion: null,
       playLog: null,
       memory: empty,
+      diary: [],
     });
   });
 });

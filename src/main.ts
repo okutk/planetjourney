@@ -20,6 +20,7 @@ import { DialogueSelector, parseRules } from './ai/dialogue';
 import { nextPlayLog } from './ai/clock';
 import { Emotion, emotionalStride, emotionVoice, moodFace, parseEmotionRules } from './ai/emotion';
 import { Codex, parseCodex } from './ai/codex';
+import { DIARY_LIMIT, expand, parseDiaryGrammar, writeDiary, type DiaryEntry } from './ai/diary';
 import { MemoryBook, parseMemoryRules } from './ai/memory';
 import { TalkDirector } from './ai/talk';
 import { pipopaTimeline, DEFAULT_PIPOPA_CONFIG } from './audio/pipopa';
@@ -28,6 +29,7 @@ import { createRandom } from './core/noise';
 import dialogueData from './data/dialogue.json';
 import memoryData from './data/memory.json';
 import codexData from './data/codex.json';
+import diaryData from './data/diary.json';
 import emotionData from './data/emotion.json';
 import { SpeechBubble } from './ui/speechBubble';
 import { BehaviorSelector, Curiosity, type Behavior, type Perception } from './ai/behavior';
@@ -58,6 +60,7 @@ import { registerServiceWorker } from './pwa/register';
 import { localStore } from './ui/localStore';
 import { PerfOverlay } from './ui/perfOverlay';
 import { CodexPanel } from './ui/codexPanel';
+import { DiaryPanel } from './ui/diaryPanel';
 import { StarMapPanel } from './ui/starMap';
 import { TouchControls } from './ui/touchControls';
 import { GimmickView, PICKUP_RADIUS } from './world/gimmickView';
@@ -158,6 +161,9 @@ function placeName(place: string): string {
 // 図鑑（src/data/codex.json）。記憶に決まった出来事が残ると、データが体験に変わる
 const codex = new Codex(parseCodex(codexData), memory);
 const codexPanel = new CodexPanel(document.body, codex, placeName);
+// ミラの日記（文法は src/data/diary.json）。星を出るときに書き、船の部屋の「日記」ボタンで読む
+const diaryGrammar = parseDiaryGrammar(diaryData);
+const diary: DiaryEntry[] = loaded?.diary ?? [];
 const talkRandom = createRandom(Date.now());
 const talk = new TalkDirector(new DialogueSelector(parseRules(dialogueData), talkRandom), speechDuration, emotion, {
   book: memory,
@@ -167,6 +173,17 @@ const talk = new TalkDirector(new DialogueSelector(parseRules(dialogueData), tal
   random: talkRandom,
   codex,
 });
+const diaryPanel = new DiaryPanel(document.body, diary, expand('empty', diaryGrammar, {}, talkRandom), () => {
+  delete talk.facts.diaryNew;
+});
+/** いまの星での出来事から日記を 1 ページ書く。星から船へ移るとき（talk.enterShip() の前）に呼ぶ */
+function writeDiaryPage(): void {
+  const at = Date.now();
+  const facts = talk.diaryFacts(at);
+  diary.push({ at, place: String(facts.planet), text: writeDiary(diaryGrammar, facts, talkRandom) });
+  if (diary.length > DIARY_LIMIT) diary.splice(0, diary.length - DIARY_LIMIT);
+  talk.facts.diaryNew = true; // 帰ってきたあいさつで、日記を書いたことを話す
+}
 
 const journey = new Journey();
 if (loaded) {
@@ -186,6 +203,7 @@ function saveGame(): void {
     emotion: emotion.snapshot(),
     playLog,
     memory: memory.toJSON(),
+    diary,
   };
   localStore.save(SAVE_KEY, data);
 }
@@ -314,6 +332,8 @@ const shipStage: Stage = {
     hud.textContent = '船の部屋';
     shipRoom.group.visible = true;
     journey.board();
+    // 星から戻ってきたら、その星での出来事から日記を書く（旅の始まりは書かない）
+    if (talk.facts.place === 'planet') writeDiaryPage();
     saveGame();
     talk.enterShip();
     // 窓（-Z 側）の方を向いて、部屋の奥に立つ
@@ -479,10 +499,11 @@ function onKeyDown(event: KeyboardEvent): void {
     event.preventDefault();
   } else if (event.code === 'KeyE' || event.code === 'Enter') {
     // 星図の中の操作はボタン自身の click に任せる（Enter で「閉じる」を押した直後に開き直さないように）
-    if (!event.repeat && !starMap.isOpen && !codexPanel.isOpen) actionRequested = true;
+    if (!event.repeat && !starMap.isOpen && !codexPanel.isOpen && !diaryPanel.isOpen) actionRequested = true;
   } else if (event.code === 'Escape') {
     starMap.close();
     codexPanel.close();
+    diaryPanel.close();
   }
 }
 function onKeyUp(event: KeyboardEvent): void {
@@ -697,8 +718,10 @@ renderer.setAnimationLoop((time) => {
 
   // スティック（なければキーボード）の入力を、カメラから見た地表の向きに直す。
   // 星図を開いている間とワープ中は、動かさない
-  const paused = starMap.isOpen || codexPanel.isOpen || warp.active;
-  codexPanel.setButtonVisible(!starMap.isOpen && !warp.active && !fader.busy);
+  const paused = starMap.isOpen || codexPanel.isOpen || diaryPanel.isOpen || warp.active;
+  const buttonsShown = !starMap.isOpen && !warp.active && !fader.busy;
+  codexPanel.setButtonVisible(buttonsShown && !diaryPanel.isOpen);
+  diaryPanel.setButtonVisible(buttonsShown && !codexPanel.isOpen && stage === shipStage);
   let stickX = paused ? 0 : touch.stick.x;
   let stickY = paused ? 0 : touch.stick.y;
   if (!paused && stickX === 0 && stickY === 0) {
