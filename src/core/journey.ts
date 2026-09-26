@@ -14,10 +14,18 @@ export class Journey {
   private readonly landings = new Map<string, number>();
   private readonly solved = new Set<string>();
   private readonly collected = new Set<string>();
-  /** 手持ちの星のかけら（拾った数から、投影機に使った数を引いたもの） */
-  fragments = 0;
-  /** 投影機の段階（0 から。上がるほどミラは物に触れられる） */
-  stage = 0;
+  private _fragments = 0;
+  private _stage = 0;
+
+  /** 手持ちの星のかけら（拾った数から、投影機に使った数を引いたもの）。減るのは upgradeProjector() だけ */
+  get fragments(): number {
+    return this._fragments;
+  }
+
+  /** 投影機の段階（0 から。上がるほどミラは物に触れられる）。上がるのは upgradeProjector() だけ */
+  get stage(): number {
+    return this._stage;
+  }
 
   /** 星（id）に降りる。その星に降りた回数（初めてなら 1）を返す。 */
   land(planet: string): number {
@@ -63,7 +71,7 @@ export class Journey {
     const key = `${planet}/${gimmick}`;
     if (this.collected.has(key)) return false;
     this.collected.add(key);
-    this.fragments += 1;
+    this._fragments += 1;
     return true;
   }
 
@@ -85,9 +93,9 @@ export class Journey {
 
   /** かけらを使って投影機の段階を 1 つ上げる。足りなければ何もせず false。 */
   upgradeProjector(): boolean {
-    if (!canUpgrade(this.stage, this.fragments)) return false;
-    this.fragments -= nextStageCost(this.stage)!;
-    this.stage += 1;
+    if (!canUpgrade(this._stage, this._fragments)) return false;
+    this._fragments -= nextStageCost(this._stage)!;
+    this._stage += 1;
     return true;
   }
 }

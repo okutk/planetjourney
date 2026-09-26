@@ -17,9 +17,16 @@ import type { Terrain } from '../core/terrain';
 
 /** 作業の効果（広がる輪）の色 */
 const EFFECT_COLOR = '#9fe8ff';
-/** 星のかけらの色と、浮かぶ位置（仕掛けの横。ランプなどと重ならないように）・回る速さ */
+/**
+ * 星のかけらの色と、浮かぶ位置（種類ごと。ランプや岩と重ならない所）・回る速さ。
+ * 灯りと石は横に、岩のすきまは 2 つの岩の上に浮かべる（岩の上端 1.22 より上）
+ */
 const FRAGMENT_COLOR = '#ffe9a8';
-const FRAGMENT_OFFSET = new Vector3(0.6, 0.9, 0);
+const FRAGMENT_OFFSETS: Record<GimmickDef['kind'], Vector3> = {
+  light: new Vector3(0.6, 0.9, 0),
+  scan: new Vector3(0.6, 0.9, 0),
+  crawl: new Vector3(0, 1.45, 0),
+};
 const FRAGMENT_SPIN = 1.6;
 /** プレイヤーがこの距離まで近づくと、かけらを拾う */
 export const PICKUP_RADIUS = 1;
@@ -53,6 +60,7 @@ export class GimmickView {
   });
   /** かけらの位置（ワールド座標）。拾える距離の判定に使う */
   readonly fragmentPosition = new Vector3();
+  private readonly fragmentOffset: Vector3;
   private spin = 0;
   /** 拾える状態か。かけらが出た瞬間にそばにいても拾わず、一度離れてから近づいたときに拾う */
   private armed = false;
@@ -116,11 +124,12 @@ export class GimmickView {
     const gem = this.track(new OctahedronGeometry(0.14, 0));
     gem.scale(1, 1.6, 1);
     this.fragment = new Mesh(gem, this.fragmentMaterial);
-    this.fragment.position.copy(FRAGMENT_OFFSET);
+    this.fragmentOffset = FRAGMENT_OFFSETS[def.kind];
+    this.fragment.position.copy(this.fragmentOffset);
     this.fragment.visible = false;
     this.group.add(this.fragment);
     // ワールド座標でのかけらの位置（仕掛けの向きに合わせて、横のずれを回す）
-    this.fragmentPosition.copy(FRAGMENT_OFFSET).applyQuaternion(this.group.quaternion).add(this.position);
+    this.fragmentPosition.copy(this.fragmentOffset).applyQuaternion(this.group.quaternion).add(this.position);
   }
 
   /**
@@ -154,7 +163,7 @@ export class GimmickView {
     if (!this.fragment.visible) return;
     this.spin += dt * FRAGMENT_SPIN;
     this.fragment.rotation.y = this.spin;
-    this.fragment.position.y = FRAGMENT_OFFSET.y + Math.sin(this.spin * 1.5) * 0.06;
+    this.fragment.position.y = this.fragmentOffset.y + Math.sin(this.spin * 1.5) * 0.06;
   }
 
   /** 解けているか（光っているか）を設定する。 */
