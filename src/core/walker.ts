@@ -4,8 +4,10 @@ import { Matrix4, Quaternion, Vector3 } from 'three';
 export interface WalkerConfig {
   /** 惑星の中心 */
   center: Vector3;
-  /** 惑星の半径（地表の高さ） */
+  /** 惑星の半径（地表の高さ）。surfaceRadius を渡したときは使わない */
   planetRadius: number;
+  /** 中心から見た方向（単位ベクトル）ごとの地表の半径。起伏のある地形のときに渡す */
+  surfaceRadius?: (up: Vector3) => number;
   /** 重力加速度（中心へ向かう。単位/秒²） */
   gravity: number;
   /** 歩く速さ（地表に沿った速さ。単位/秒） */
@@ -21,7 +23,9 @@ export interface WalkInput {
   jump: boolean;
 }
 
-export const DEFAULT_WALKER_CONFIG: Readonly<Omit<WalkerConfig, 'center' | 'planetRadius'>> = {
+export const DEFAULT_WALKER_CONFIG: Readonly<
+  Omit<WalkerConfig, 'center' | 'planetRadius' | 'surfaceRadius'>
+> = {
   gravity: 18,
   walkSpeed: 4,
   jumpSpeed: 7,
@@ -59,7 +63,7 @@ export class SphericalWalker {
 
   /** 地表からの高さ（地面に立っていれば 0）。 */
   get altitude(): number {
-    return this.position.distanceTo(this.config.center) - this.config.planetRadius;
+    return this.position.distanceTo(this.config.center) - this.surfaceRadius(this.up);
   }
 
   /** 中心から見た direction の地表に立たせる。heading は向きの目安で、地表に沿うよう補正する。 */
@@ -67,7 +71,7 @@ export class SphericalWalker {
     this.up.copy(direction).normalize();
     this.position
       .copy(this.up)
-      .multiplyScalar(this.config.planetRadius + altitude)
+      .multiplyScalar(this.surfaceRadius(this.up) + altitude)
       .add(this.config.center);
     this.forward.copy(heading);
     this.orthonormalizeForward();
@@ -95,7 +99,7 @@ export class SphericalWalker {
 
   /** dt 秒だけ進める。 */
   step(input: WalkInput, dt: number): void {
-    const { center, planetRadius, gravity, walkSpeed, jumpSpeed } = this.config;
+    const { center, gravity, walkSpeed, jumpSpeed } = this.config;
 
     // ジャンプ（接地しているときだけ。空中ジャンプはしない）
     if (input.jump && this.grounded) {
@@ -130,8 +134,9 @@ export class SphericalWalker {
 
     // 接地判定: 地表より下に行ったら地表に戻して着地。
     // 接地中は誤差を持ち越さないよう、毎ステップ地表の高さに固定する
-    if (this.grounded || height <= planetRadius) {
-      height = planetRadius;
+    const surface = this.surfaceRadius(this.up);
+    if (this.grounded || height <= surface) {
+      height = surface;
       this.verticalSpeed = 0;
       this.grounded = true;
     }
@@ -145,6 +150,11 @@ export class SphericalWalker {
     tmpRight.crossVectors(this.up, this.forward);
     tmpBasis.makeBasis(tmpRight, this.up, this.forward);
     return out.setFromRotationMatrix(tmpBasis);
+  }
+
+  /** up の方向の地表の半径。 */
+  private surfaceRadius(up: Vector3): number {
+    return this.config.surfaceRadius ? this.config.surfaceRadius(up) : this.config.planetRadius;
   }
 
   /** 誤差の蓄積を防ぐため、forward を up に直交する単位ベクトルへ戻す。 */

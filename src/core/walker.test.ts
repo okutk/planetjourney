@@ -158,3 +158,41 @@ describe('SphericalWalker の向きの制御', () => {
     expect(walker.lastRotation.w).toBe(1);
   });
 });
+
+describe('SphericalWalker と起伏のある地形', () => {
+  // 北極側（y が大きい）ほど高い、なだらかな地形
+  const surfaceRadius = (up: Vector3) => RADIUS + up.y;
+
+  it('歩くと地表の高さに沿って上り下りする', () => {
+    const walker = new SphericalWalker({
+      ...DEFAULT_WALKER_CONFIG,
+      center: new Vector3(),
+      planetRadius: RADIUS,
+      surfaceRadius,
+    });
+    expect(walker.position.length()).toBeCloseTo(RADIUS + 1);
+    run(walker, WALK, 1);
+    expect(walker.grounded).toBe(true);
+    expect(walker.altitude).toBeCloseTo(0);
+    expect(walker.position.length()).toBeCloseTo(RADIUS + walker.up.y);
+    expect(walker.position.length()).toBeLessThan(RADIUS + 1);
+  });
+
+  it('ジャンプすると、その場所の地表に着地する', () => {
+    const walker = new SphericalWalker({
+      ...DEFAULT_WALKER_CONFIG,
+      center: new Vector3(),
+      planetRadius: RADIUS,
+      surfaceRadius,
+    });
+    walker.placeAt(new Vector3(1, 1, 0), new Vector3(0, 0, 1));
+    walker.step(JUMP, DT);
+    let t = 0;
+    while (!walker.grounded && t < 5) {
+      walker.step(WALK, DT);
+      t += DT;
+    }
+    expect(walker.grounded).toBe(true);
+    expect(walker.position.length()).toBeCloseTo(RADIUS + walker.up.y);
+  });
+});
