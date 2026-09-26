@@ -12,3 +12,4 @@
 | ライブラリ | ライセンス |
 |---|---|
 | three.js | MIT |
+| @pixiv/three-vrm | MIT |
