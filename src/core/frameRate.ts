@@ -11,10 +11,20 @@ export class FrameRateMeter {
   private frames = 0;
   private worst = 0;
 
+  /** これより長いフレーム（秒）は、描画の重さではなく中断とみなす */
+  static readonly MAX_FRAME = 1;
+
   constructor(readonly interval = 0.5) {}
 
   /** 1 フレームごとに、経過時間（秒）を渡す。区間が確定したら true を返す。 */
   tick(dt: number): boolean {
+    // 別のタブから戻った直後などの極端に長いフレームは、計測から外して区間をやり直す
+    if (dt > FrameRateMeter.MAX_FRAME) {
+      this.elapsed = 0;
+      this.frames = 0;
+      this.worst = 0;
+      return false;
+    }
     this.elapsed += dt;
     this.frames += 1;
     this.worst = Math.max(this.worst, dt);
