@@ -63,9 +63,13 @@ export class StarMapPanel {
       if (!card.disabled) this.setStatus(id, id === currentId ? 'いまここ' : '');
     }
     this.element.hidden = false;
+    // キーボードや読み上げでも扱えるよう、最初に押せるカード（なければ「閉じる」）へフォーカスを移す
+    const first = [...this.cards.values()].find((card) => !card.disabled) ?? this.closeButton;
+    first.focus();
   }
 
   close(): void {
+    if (this.element.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
     this.element.hidden = true;
   }
 

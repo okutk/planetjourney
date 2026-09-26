@@ -44,6 +44,21 @@ describe('WarpSequence', () => {
     expect(warp.intensity).toBe(0);
   });
 
+  it('start に長さを渡すと charge を延ばせる（設定より短くはならない）', () => {
+    const warp = new WarpSequence({ charge: 1, jump: 0.5, settle: 0.5 });
+    warp.start(2);
+    for (let t = 0; t < 1.5; t += DT) expect(warp.update(DT)).toBe(false);
+    expect(warp.phase).toBe('charge');
+    let signalled = false;
+    for (let t = 1.5; t < 2.5; t += DT) signalled ||= warp.update(DT);
+    expect(signalled).toBe(true);
+    // 次の start では設定の長さに戻る
+    for (let t = 0; t < 2; t += DT) warp.update(DT);
+    warp.start(0.2);
+    for (let t = 0; t < 0.9; t += DT) warp.update(DT);
+    expect(warp.phase).toBe('charge');
+  });
+
   it('動いている途中の start は無視する', () => {
     const warp = new WarpSequence({ charge: 1, jump: 0.5, settle: 0.5 });
     warp.start();

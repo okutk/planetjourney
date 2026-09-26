@@ -65,6 +65,7 @@ const KEY_CAMERA_SPEED = 2; // 矢印キーでカメラを回す速さ（ラジ�
 const BODY_RADIUS = 0.3; // プレイヤーの体の太さ（壁や台にめり込まない距離）
 const ACTION_RADIUS = 1.4; // 調べられる物から、この距離まで近づくとボタンが出る
 const ARRIVE_TALK_DELAY = 1; // 場所に入ってから話し始めるまで（秒）
+const WARP_LINE_MARGIN = 0.6; // ワープのセリフを言い切ってから暗転するまでの間（秒）
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
 const hud = document.querySelector<HTMLElement>('#hud')!;
@@ -118,10 +119,12 @@ player.add(new Mesh(noseGeometry, new MeshStandardMaterial({ color: '#40325c' })
 scene.add(player);
 
 // ミラの会話。セリフは src/data/dialogue.json から条件で選び、吹き出しとピポパ音声で話す
-const talk = new TalkDirector(new DialogueSelector(parseRules(dialogueData), createRandom(Date.now())), (text) => {
+/** セリフを話し終えるまでの秒数（文字送り・音の長さに合わせる） */
+function speechDuration(text: string): number {
   const { revealAt } = pipopaTimeline(text);
   return (revealAt.at(-1) ?? 0) + DEFAULT_PIPOPA_CONFIG.charInterval;
-});
+}
+const talk = new TalkDirector(new DialogueSelector(parseRules(dialogueData), createRandom(Date.now())), speechDuration);
 
 // ミラ（仮の見た目）。プレイヤーの斜め後ろの定位置を目指して、プレイヤーと同じ歩き方でついてくる
 const mira = new MiraPlaceholder();
@@ -179,7 +182,7 @@ const shipStage: Stage = {
   act() {
     starMap.open(journey.planet);
     touch.release();
-    say(talk.openedStarMap(elapsed), elapsed);
+    say(talk.openedStarMap(now), now);
   },
 };
 
@@ -193,7 +196,7 @@ const planetStage: Stage = {
   enter() {
     hud.textContent = ORIGIN.name;
     shipRoom.group.visible = false;
-    talk.enterPlanet(ORIGIN.name, journey.land(ORIGIN.name));
+    talk.enterPlanet(ORIGIN.name, journey.land(ORIGIN.id));
     planetWalker.placeAt(SPAWN_DIRECTION, new Vector3(0, 0, 1));
     const slot = followSlot(planetWalker, DEFAULT_FOLLOW_CONFIG, new Vector3()).sub(planetCenter);
     planetMira.placeAt(slot, planetWalker.forward);
@@ -296,7 +299,7 @@ const bubbleAnchor = new Vector3();
 const fader = new Fader(document.body);
 let stage: Stage;
 let greetAt = Infinity; // この時刻になったら、入った場所のあいさつをする
-let elapsed = 0; // ゲームを始めてからの秒数（あいさつの時刻に使う）
+let now = 0; // ループの時刻（秒）。会話と吹き出しはすべてこの時計で動く（時計を混ぜると吹き出しが消える）
 function enterStage(next: Stage): void {
   stage = next;
   stage.enter();
@@ -308,10 +311,11 @@ function enterStage(next: Stage): void {
   orbit.reset(stage.walker.forward, stage.walker.up);
   camera.position.copy(orbit.eye(stage.walker.position, stage.walker.up, cameraGoal));
   camera.up.copy(stage.walker.up);
-  greetAt = elapsed + ARRIVE_TALK_DELAY;
+  greetAt = now + ARRIVE_TALK_DELAY;
 }
-function switchTo(next: Stage): void {
-  fader.run(() => enterStage(next));
+/** 暗転して next へ移る。すでに暗転中なら移れず false。 */
+function switchTo(next: Stage): boolean {
+  return fader.run(() => enterStage(next));
 }
 
 // 星図とワープ。星図で星を選ぶと、流れる星が強まり、暗転の先で星に降りる
@@ -324,8 +328,13 @@ const starMap = new StarMapPanel(
   PLANETS,
   (planet) => {
     starMap.close();
-    warp.start();
-    say(talk.warp(elapsed, planet.name), elapsed);
+    // ワープはプレイヤーが決めた行動なので、星図のセリフの途中でも打ち切って話す。
+    // セリフを言い切ってから暗転するよう、流れる星の時間をセリフの長さまで延ばす
+    talk.interrupt();
+    voice.stop();
+    const line = talk.warp(now, planet.name);
+    say(line, now);
+    warp.start(line ? speechDuration(line.text) + WARP_LINE_MARGIN - FADE_SECONDS : 0);
   },
   () => starMap.close(),
 );
@@ -338,7 +347,7 @@ renderer.setAnimationLoop((time) => {
   const rawDt = lastTime === undefined ? 0 : (time - lastTime) / 1000;
   const dt = Math.min(rawDt, MAX_DT);
   lastTime = time;
-  elapsed += dt;
+  now = time / 1000;
   const { walker, mira: miraWalker } = stage;
 
   orbit.rotate(
@@ -382,14 +391,13 @@ renderer.setAnimationLoop((time) => {
   actionRequested = false;
   if (nearSpot && action) stage.act();
 
-  // ワープ: 流れる星を進め、暗転に入る瞬間に星へ降りる
-  if (warp.update(dt)) switchTo(planetStage);
+  // ワープ: 流れる星を進め、暗転に入る瞬間に星へ降りる（暗転中は移れないが、星図は暗転中に開けないので起きないはず）
+  if (warp.update(dt) && !switchTo(planetStage)) console.warn('ワープ先へ移れなかった（暗転中）');
   streaks.update(dt, warp.intensity);
 
   // 会話: 場所に入ったとき・ジャンプしたとき・しばらく放っておかれたとき。
   // 入ってからあいさつまでの間は、ジャンプなどのセリフで割り込ませない（あいさつが消えないように）
-  const now = time / 1000;
-  if (elapsed >= greetAt) {
+  if (now >= greetAt) {
     greetAt = Infinity;
     say(talk.greet(now), now);
   } else if (greetAt !== Infinity) {

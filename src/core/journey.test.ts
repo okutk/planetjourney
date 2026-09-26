@@ -6,18 +6,18 @@ describe('Journey', () => {
     const journey = new Journey();
     expect(journey.place).toBe('ship');
     expect(journey.planet).toBeNull();
-    expect(journey.visits('はじまりの星')).toBe(0);
+    expect(journey.visits('origin')).toBe(0);
   });
 
   it('星に降りるたびに回数を数え、船に戻っても最後の星を覚えている', () => {
     const journey = new Journey();
-    expect(journey.land('はじまりの星')).toBe(1);
+    expect(journey.land('origin')).toBe(1);
     expect(journey.place).toBe('planet');
     journey.board();
     expect(journey.place).toBe('ship');
-    expect(journey.planet).toBe('はじまりの星');
-    expect(journey.land('はじまりの星')).toBe(2);
-    expect(journey.land('水晶の星')).toBe(1);
-    expect(journey.visits('はじまりの星')).toBe(2);
+    expect(journey.planet).toBe('origin');
+    expect(journey.land('origin')).toBe(2);
+    expect(journey.land('crystal')).toBe(1);
+    expect(journey.visits('origin')).toBe(2);
   });
 });

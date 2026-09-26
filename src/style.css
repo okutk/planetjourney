@@ -104,9 +104,10 @@ body {
   background: rgba(159, 232, 255, 0.6);
 }
 
-/* 場所を切り替えるときの暗転 */
+/* 場所を切り替えるときの暗転。いちばん上に描く */
 .fade {
   position: fixed;
+  z-index: 3;
   inset: 0;
   background: #000;
   opacity: 0;
@@ -140,9 +141,10 @@ body {
   pointer-events: none;
 }
 
-/* ミラの吹き出し */
+/* ミラの吹き出し。星図より上、暗転より下に描く */
 .speech-bubble {
   position: fixed;
+  z-index: 2;
   top: 0;
   left: 0;
   max-width: min(60vw, 320px);
@@ -180,9 +182,10 @@ body {
   white-space: nowrap;
 }
 
-/* 星図（船の部屋で開く、行き先を選ぶ画面） */
+/* 星図（船の部屋で開く、行き先を選ぶ画面）。操作の層より上、吹き出しより下に描く */
 .star-map {
   position: fixed;
+  z-index: 1;
   inset: 0;
   display: flex;
   flex-direction: column;
