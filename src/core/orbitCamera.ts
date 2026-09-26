@@ -25,8 +25,9 @@ export const DEFAULT_ORBIT_CAMERA_CONFIG: Readonly<OrbitCameraConfig> = {
   recenterRate: 1.5,
 };
 
-// これより大きく向きが違う（プレイヤーがカメラの方へ歩いてくる）ときは回り込まない
-const MAX_RECENTER_ANGLE = (Math.PI * 3) / 4;
+// スティックがほぼ前（この角度以内）に倒されているときだけ回り込む。
+// 移動はカメラ基準なので、横や斜めへ歩いているときに回り込むと、進む向きも一緒に回って円を描いてしまう
+const RECENTER_CONE = (25 * Math.PI) / 180;
 
 const tmpCross = new Vector3();
 
@@ -64,14 +65,19 @@ export class OrbitCamera {
     toTangent(this.heading.applyQuaternion(rotation), up);
   }
 
-  /** 歩いているあいだ、しばらく手で回していなければ、プレイヤーの後ろへ少しずつ回り込む。 */
-  update(dt: number, forward: Vector3, up: Vector3, moving: boolean): void {
+  /**
+   * 前へ歩いているあいだ、しばらく手で回していなければ、プレイヤーの後ろへ少しずつ回り込む。
+   * stickX・stickY はカメラ基準の移動入力（前が +y）。前からずれるほど弱め、RECENTER_CONE の外では回り込まない。
+   */
+  update(dt: number, forward: Vector3, up: Vector3, stickX: number, stickY: number): void {
     this.sinceManual += dt;
-    if (!moving || this.sinceManual < this.config.recenterDelay) return;
+    const amount = Math.min(1, Math.hypot(stickX, stickY));
+    if (amount === 0 || this.sinceManual < this.config.recenterDelay) return;
+    const weight = amount * Math.max(0, 1 - Math.atan2(Math.abs(stickX), stickY) / RECENTER_CONE);
+    if (weight === 0) return;
     tmpCross.crossVectors(this.heading, forward);
     const angle = Math.atan2(tmpCross.dot(up), this.heading.dot(forward));
-    if (Math.abs(angle) > MAX_RECENTER_ANGLE) return;
-    this.heading.applyAxisAngle(up, angle * (1 - Math.exp(-this.config.recenterRate * dt)));
+    this.heading.applyAxisAngle(up, angle * (1 - Math.exp(-this.config.recenterRate * weight * dt)));
     toTangent(this.heading, up);
   }
 
