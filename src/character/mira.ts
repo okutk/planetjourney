@@ -1,6 +1,7 @@
 import { Box3, Group, type Object3D } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { VRM, VRMLoaderPlugin, VRMMetaLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+import { HologramLook } from './hologram';
 import { buildProceduralClips, MiraMotion, type MotionClips } from './miraMotion';
 import { MiraPlaceholder } from './miraPlaceholder';
 
@@ -27,6 +28,7 @@ export class MiraView {
   vrm: VRM | null = null;
   private placeholder: MiraPlaceholder | null;
   private motion: MiraMotion | null = null;
+  private hologram: HologramLook | null = null;
   /** 差し替え用のモーション。null なら手続きのモーションを使う */
   private clips: MotionClips | null = null;
   private disposed = false;
@@ -82,6 +84,8 @@ export class MiraView {
     this.vrm = vrm;
     this.group.add(vrm.scene);
     this.motion = new MiraMotion(vrm.scene, this.clips ?? buildProceduralClips(vrm));
+    this.hologram = new HologramLook(vrm);
+    this.hologram.update(0, 1);
     // T ポーズのまま 1 フレームも見せないよう、最初の姿勢をすぐ反映する
     this.motion.update(0, 0);
     vrm.update(0);
@@ -100,9 +104,13 @@ export class MiraView {
     }
   }
 
-  /** 毎フレーム呼ぶ。位置と向きを group に入れたあと、描画の前に呼ぶこと。walkAmount は歩く量（0〜1） */
-  update(dt: number, walkAmount: number): void {
+  /**
+   * 毎フレーム呼ぶ。位置と向きを group に入れたあと、描画の前に呼ぶこと。
+   * walkAmount は歩く量（0〜1）、noise は投影範囲の端のノイズ（0〜1）、visibility は見え方（0 で消えている）
+   */
+  update(dt: number, walkAmount: number, noise = 0, visibility = 1): void {
     this.motion?.update(dt, walkAmount);
+    this.hologram?.update(noise, visibility);
     this.vrm?.update(dt);
   }
 
@@ -122,6 +130,7 @@ export class MiraView {
     this.placeholder = null;
     this.motion?.dispose();
     this.motion = null;
+    this.hologram = null;
     if (this.vrm) {
       VRMUtils.deepDispose(this.vrm.scene);
       this.vrm.scene.removeFromParent();
