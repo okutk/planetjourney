@@ -16,7 +16,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
-import { DEFAULT_FOLLOW_CONFIG, followIntent, type FollowIntent } from './ai/companion';
+import { DEFAULT_FOLLOW_CONFIG, followIntent, followSlot, type FollowIntent } from './ai/companion';
 import { MiraPlaceholder } from './character/miraPlaceholder';
 import { DEFAULT_ORBIT_CAMERA_CONFIG, OrbitCamera } from './core/orbitCamera';
 import { Terrain } from './core/terrain';
@@ -98,7 +98,11 @@ const miraWalker = new SphericalWalker({
   planetRadius: PLANET_RADIUS,
   surfaceRadius: (up) => terrain.radiusAt(up),
 });
-miraWalker.placeAt(new Vector3(0.25, 1, -0.3), new Vector3(0, 0, 1));
+// 最初からプレイヤーの斜め後ろの定位置に立たせる（出現方向を変えても一緒に動く）
+miraWalker.placeAt(
+  followSlot(walker, DEFAULT_FOLLOW_CONFIG, new Vector3()).sub(planetCenter),
+  walker.forward,
+);
 const miraIntent: FollowIntent = { direction: new Vector3(), amount: 0 };
 const miraInput: WalkInput = { forward: 0, right: 0, jump: false };
 

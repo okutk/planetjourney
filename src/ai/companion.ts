@@ -34,6 +34,15 @@ const tmpSlot = new Vector3();
 const tmpRight = new Vector3();
 const tmpAway = new Vector3();
 
+/** プレイヤーの斜め後ろの「定位置」（後ろ behind、右へ side）を out に書き込む。 */
+export function followSlot(player: SphericalWalker, config: FollowConfig, out: Vector3): Vector3 {
+  tmpRight.crossVectors(player.forward, player.up);
+  return out
+    .copy(player.position)
+    .addScaledVector(player.forward, -config.behind)
+    .addScaledVector(tmpRight, config.side);
+}
+
 /**
  * プレイヤーの斜め後ろの「定位置」へ向かう動きを決める。描画や DOM には依存しない。
  * プレイヤーが向きを変えると定位置も動くので、ミラはプレイヤーのまわりを回り込んでついてくる。
@@ -45,12 +54,7 @@ export function followIntent(
   config: FollowConfig,
   out: FollowIntent,
 ): FollowIntent {
-  // 定位置: プレイヤーの後ろ behind、右へ side
-  tmpRight.crossVectors(player.forward, player.up);
-  tmpSlot
-    .copy(player.position)
-    .addScaledVector(player.forward, -config.behind)
-    .addScaledVector(tmpRight, config.side);
+  followSlot(player, config, tmpSlot);
 
   out.direction.subVectors(tmpSlot, mira.position);
   const distance = out.direction.length();
